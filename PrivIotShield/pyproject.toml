@@ -8,6 +8,7 @@ dependencies = [
     "flask-wtf>=1.2.2",
     "flask>=3.1.0",
     "flask-login>=0.6.3",
+    "flask-migrate>=4.0.5",
     "flask-sqlalchemy>=3.1.1",
     "gunicorn>=23.0.0",
     "markupsafe>=3.0.2",
@@ -19,4 +20,5 @@ dependencies = [
     "twilio>=9.5.2",
     "numpy>=2.2.4",
     "requests>=2.32.3",
+    "python-dateutil>=2.8.2",
 ]
