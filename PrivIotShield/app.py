@@ -6,6 +6,7 @@ from sqlalchemy.orm import DeclarativeBase
 from flask_login import LoginManager
 from werkzeug.security import generate_password_hash
 from flask_wtf.csrf import CSRFProtect
+from flask_migrate import Migrate
 
 
 # Configure logging
@@ -18,12 +19,17 @@ class Base(DeclarativeBase):
 
 
 db = SQLAlchemy(model_class=Base)
+migrate = Migrate()
+
 # Create the app
 app = Flask(__name__)
 app.secret_key = os.environ.get("SESSION_SECRET", "dev-priviot-secret-key-2025")
 
 # Initialize CSRF protection
 csrf = CSRFProtect(app)
+
+# Initialize database migration
+migrate.init_app(app, db)
 
 # Configure CSRF exemptions for API endpoints that use token authentication
 # In a production environment, we would use a more secure method for API authentication
@@ -76,13 +82,31 @@ login_manager.login_view = 'login'
 # Initialize the app with the extension
 db.init_app(app)
 
+# Error handlers
+@app.errorhandler(404)
+def not_found_error(error):
+    return render_template('errors/404.html'), 404
+
+@app.errorhandler(500)
+def internal_error(error):
+    db.session.rollback()
+    return render_template('errors/500.html'), 500
+
+@app.errorhandler(403)
+def forbidden_error(error):
+    return render_template('errors/403.html'), 403
+
 # Import routes after app initialization to avoid circular imports
 with app.app_context():
     # Import models and create tables
     import models
     
     # Create database tables first
-    db.create_all()
+    try:
+        db.create_all()
+    except Exception as e:
+        logger.error(f"Database initialization failed: {str(e)}")
+        raise
     logger.info("Database tables created successfully")
     
     # Now import routes after tables are created
@@ -96,15 +120,19 @@ with app.app_context():
     from models import User
     admin_exists = User.query.filter_by(username='admin').first()
     if not admin_exists:
-        admin_password = os.environ.get("ADMIN_PASSWORD", "PrivIoTAdmin123!")
-        admin = User(
-            username='admin',
-            email='admin@priviot.io',
-            password_hash=generate_password_hash(admin_password),
-            role='admin'
-        )
-        db.session.add(admin)
-        db.session.commit()
-        logger.info("Admin user created successfully")
+        try:
+            admin_password = os.environ.get("ADMIN_PASSWORD", "PrivIoTAdmin123!")
+            admin = User(
+                username='admin',
+                email='admin@priviot.io',
+                password_hash=generate_password_hash(admin_password),
+                role='admin'
+            )
+            db.session.add(admin)
+            db.session.commit()
+            logger.info("Admin user created successfully")
+        except Exception as e:
+            logger.error(f"Failed to create admin user: {str(e)}")
+            db.session.rollback()
 
 logger.info("PrivIoT application initialized successfully")
