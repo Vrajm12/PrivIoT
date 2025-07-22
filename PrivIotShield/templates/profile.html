@@ -1,0 +1,296 @@
+{% extends "layout.html" %}
+
+{% block title %}Profile - PrivIoT{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row mb-4">
+        <div class="col-12">
+            <h1 class="mb-0">
+                <i class="fas fa-user-circle me-2"></i>Profile
+            </h1>
+        </div>
+    </div>
+    
+    <div class="row">
+        <!-- Profile Information -->
+        <div class="col-lg-8 mb-4">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">Profile Information</h5>
+                </div>
+                <div class="card-body">
+                    <form method="post" action="{{ url_for('profile') }}">
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label for="username" class="form-label">Username</label>
+                                <input type="text" class="form-control" id="username" name="username" value="{{ current_user.username }}" required>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="email" class="form-label">Email Address</label>
+                                <input type="email" class="form-control" id="email" name="email" value="{{ current_user.email }}" required>
+                            </div>
+                        </div>
+                        
+                        <hr class="my-4">
+                        <h5>Change Password</h5>
+                        <p class="text-muted small">Leave blank if you don't want to change your password</p>
+                        
+                        <div class="row g-3">
+                            <div class="col-md-4">
+                                <label for="current_password" class="form-label">Current Password</label>
+                                <input type="password" class="form-control" id="current_password" name="current_password">
+                            </div>
+                            <div class="col-md-4">
+                                <label for="new_password" class="form-label">New Password</label>
+                                <input type="password" class="form-control" id="new_password" name="new_password">
+                            </div>
+                            <div class="col-md-4">
+                                <label for="confirm_password" class="form-label">Confirm New Password</label>
+                                <input type="password" class="form-control" id="confirm_password" name="confirm_password">
+                            </div>
+                        </div>
+                        
+                        <div class="mt-4">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-save me-1"></i> Save Changes
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+        
+        <!-- API Key Information -->
+        <div class="col-lg-4">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">API Key</h5>
+                </div>
+                <div class="card-body">
+                    <p>Use this API key to authenticate your requests to the PrivIoT API.</p>
+                    
+                    <div class="api-key mb-3">
+                        {% if current_user.api_key %}
+                            <code>{{ current_user.api_key }}</code>
+                        {% else %}
+                            <code>No API key generated</code>
+                        {% endif %}
+                    </div>
+                    
+                    <div class="d-grid">
+                        <a href="{{ url_for('profile', regenerate_api_key='true') }}" class="btn btn-warning" onclick="return confirm('Are you sure you want to regenerate your API key? This will invalidate your existing key.')">
+                            <i class="fas fa-sync-alt me-1"></i> Regenerate API Key
+                        </a>
+                    </div>
+                    
+                    <div class="mt-3">
+                        <p class="mb-0 small text-muted">
+                            <i class="fas fa-info-circle me-1"></i> Regenerating your API key will invalidate your existing key. Make sure to update any applications using your API key.
+                        </p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">Account Information</h5>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <div><strong>Account Type:</strong> {{ current_user.role|capitalize }}</div>
+                        <div><strong>Created:</strong> {{ current_user.created_at.strftime('%Y-%m-%d') }}</div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <h6>Theme Preference</h6>
+                        <div class="btn-group w-100 mb-3" role="group" aria-label="Theme Preference">
+                            <a href="{{ url_for('toggle_theme') }}" class="btn {{ 'btn-primary' if session.get('theme') == 'dark' else 'btn-outline-primary' }}">
+                                <i class="fas fa-moon me-1"></i> Dark
+                            </a>
+                            <a href="{{ url_for('toggle_theme') }}" class="btn {{ 'btn-primary' if session.get('theme') == 'light' else 'btn-outline-primary' }}">
+                                <i class="fas fa-sun me-1"></i> Light
+                            </a>
+                        </div>
+                    </div>
+                    
+                    {% if current_user.role == 'admin' %}
+                        <div class="alert alert-info mb-3">
+                            <i class="fas fa-star me-2"></i> You have administrator privileges.
+                        </div>
+                    {% endif %}
+                    
+                    <div class="d-grid">
+                        <a href="{{ url_for('logout') }}" class="btn btn-outline-danger">
+                            <i class="fas fa-sign-out-alt me-1"></i> Logout
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Account Activity and Stats -->
+    <div class="row">
+        <div class="col-lg-8 mb-4">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="card-title mb-0">Account Activity</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row mb-4">
+                        <div class="col-md-4 mb-3 mb-md-0">
+                            <div class="card text-center h-100">
+                                <div class="card-body d-flex flex-column justify-content-center">
+                                    <h3 class="display-4 text-primary">{{ current_user.devices.count() }}</h3>
+                                    <p class="mb-0">Devices</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4 mb-3 mb-md-0">
+                            <div class="card text-center h-100">
+                                <div class="card-body d-flex flex-column justify-content-center">
+                                    <h3 class="display-4 text-primary">{{ current_user.scans.count() }}</h3>
+                                    <p class="mb-0">Scans</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="card text-center h-100">
+                                <div class="card-body d-flex flex-column justify-content-center">
+                                    {% set completed_scans = current_user.scans.filter_by(status='completed').all() %}
+                                    {% set total_vulnerabilities = 0 %}
+                                    {% for scan in completed_scans %}
+                                        {% set total_vulnerabilities = total_vulnerabilities + scan.vulnerabilities.count() %}
+                                    {% endfor %}
+                                    <h3 class="display-4 text-primary">{{ total_vulnerabilities }}</h3>
+                                    <p class="mb-0">Issues Found</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <h6>Recent Activity</h6>
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Activity</th>
+                                    <th>Device</th>
+                                    <th>Date</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% set recent_scans = current_user.scans.order_by(Scan.scan_date.desc()).limit(5).all() %}
+                                {% if recent_scans %}
+                                    {% for scan in recent_scans %}
+                                        <tr>
+                                            <td>Security Scan</td>
+                                            <td>{{ scan.device.name }}</td>
+                                            <td>{{ scan.scan_date.strftime('%Y-%m-%d %H:%M') }}</td>
+                                            <td>
+                                                <span class="scan-status scan-status-{{ scan.status }}">
+                                                    {{ scan.status|capitalize }}
+                                                </span>
+                                            </td>
+                                        </tr>
+                                    {% endfor %}
+                                {% else %}
+                                    <tr>
+                                        <td colspan="4" class="text-center">No recent activity</td>
+                                    </tr>
+                                {% endif %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-lg-4 mb-4">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">Security Overview</h5>
+                </div>
+                <div class="card-body">
+                    {% set completed_scans = current_user.scans.filter_by(status='completed').all() %}
+                    {% set avg_security_score = 0 %}
+                    {% set avg_privacy_score = 0 %}
+                    
+                    {% if completed_scans %}
+                        {% set security_score_sum = 0 %}
+                        {% set privacy_score_sum = 0 %}
+                        {% for scan in completed_scans %}
+                            {% if scan.security_score %}
+                                {% set security_score_sum = security_score_sum + scan.security_score %}
+                            {% endif %}
+                            {% if scan.privacy_score %}
+                                {% set privacy_score_sum = privacy_score_sum + scan.privacy_score %}
+                            {% endif %}
+                        {% endfor %}
+                        
+                        {% if completed_scans|length > 0 %}
+                            {% set avg_security_score = security_score_sum / completed_scans|length %}
+                            {% set avg_privacy_score = privacy_score_sum / completed_scans|length %}
+                        {% endif %}
+                        
+                        <div class="row mb-4">
+                            <div class="col-6 text-center">
+                                <div class="security-score-container">
+                                    <canvas id="securityScoreChart" data-score="{{ avg_security_score }}"></canvas>
+                                </div>
+                                <div class="mt-2">Security Score</div>
+                            </div>
+                            <div class="col-6 text-center">
+                                <div class="security-score-container">
+                                    <canvas id="privacyScoreChart" data-score="{{ avg_privacy_score }}"></canvas>
+                                </div>
+                                <div class="mt-2">Privacy Score</div>
+                            </div>
+                        </div>
+                        
+                        <div class="alert alert-{{ 'success' if avg_security_score >= 7.0 else 'warning' if avg_security_score >= 5.0 else 'danger' }}">
+                            <h6 class="alert-heading">Security Assessment</h6>
+                            {% if avg_security_score >= 7.0 %}
+                                <p class="mb-0">Your devices are well-protected. Continue maintaining good security practices.</p>
+                            {% elif avg_security_score >= 5.0 %}
+                                <p class="mb-0">Your devices have moderate security. Address identified vulnerabilities to improve security.</p>
+                            {% else %}
+                                <p class="mb-0">Your devices have significant security risks. Immediate action is recommended.</p>
+                            {% endif %}
+                        </div>
+                    {% else %}
+                        <div class="text-center py-4">
+                            <i class="fas fa-shield-alt fa-3x text-muted mb-3"></i>
+                            <p>No security data available yet. Start scanning your devices to see your security overview.</p>
+                            <a href="{{ url_for('devices') }}" class="btn btn-primary mt-2">
+                                <i class="fas fa-shield-alt me-1"></i> Scan Devices
+                            </a>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/charts.js') }}"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Initialize security score chart if element exists
+    const securityScoreCanvas = document.getElementById('securityScoreChart');
+    if (securityScoreCanvas) {
+        createScoreGauge('securityScoreChart', {{ avg_security_score }}, 'security');
+    }
+    
+    // Initialize privacy score chart if element exists
+    const privacyScoreCanvas = document.getElementById('privacyScoreChart');
+    if (privacyScoreCanvas) {
+        createScoreGauge('privacyScoreChart', {{ avg_privacy_score }}, 'privacy');
+    }
+});
+</script>
+{% endblock %}

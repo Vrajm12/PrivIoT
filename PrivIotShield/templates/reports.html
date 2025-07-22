@@ -1,0 +1,189 @@
+{% extends "layout.html" %}
+
+{% block title %}Security Reports - PrivIoT{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <h1 class="mb-0">
+                    <i class="fas fa-file-alt me-2"></i>Security Reports
+                </h1>
+                <div>
+                    <span class="me-2">Filter by type:</span>
+                    <select id="reportTypeFilter" class="form-select d-inline-block" style="width: auto;">
+                        <option value="all">All Reports</option>
+                        <option value="detailed">Detailed Reports</option>
+                        <option value="summary">Summary Reports</option>
+                        <option value="executive">Executive Reports</option>
+                    </select>
+                </div>
+            </div>
+            <p class="text-muted mt-2">Showing <span id="reportCount">{{ reports|length }}</span> reports</p>
+        </div>
+    </div>
+    
+    <!-- Reports List -->
+    <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-4">
+        {% if reports %}
+            {% for report in reports %}
+                <div class="col report-card" data-report-id="{{ report.id }}" data-report-type="{{ report.report_type }}">
+                    <div class="card h-100">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <h5 class="card-title mb-0 report-title">{{ report.title }}</h5>
+                            <span class="badge bg-{{ 'primary' if report.report_type == 'detailed' else 'info' if report.report_type == 'summary' else 'secondary' }}">
+                                {{ report.report_type|capitalize }}
+                            </span>
+                        </div>
+                        <div class="card-body">
+                            <div class="mb-3">
+                                <div><strong>Device:</strong> {{ report.scan.device.name }}</div>
+                                <div><strong>Generated:</strong> <span class="report-date" data-date="{{ report.generated_at.isoformat() }}">{{ report.generated_at.strftime('%Y-%m-%d %H:%M') }}</span></div>
+                                <div>
+                                    <strong>Risk Level:</strong> 
+                                    <span class="badge risk-level risk-level-{{ report.scan.risk_level }}">
+                                        {{ report.scan.risk_level|capitalize }}
+                                    </span>
+                                </div>
+                            </div>
+                            
+                            <div class="d-grid gap-2">
+                                <a href="{{ url_for('report_detail', report_id=report.id) }}" class="btn btn-primary">
+                                    <i class="fas fa-eye me-1"></i> View Report
+                                </a>
+                                <button type="button" class="btn btn-outline-primary" onclick="previewReport({{ report.id }})">
+                                    <i class="fas fa-search me-1"></i> Quick Preview
+                                </button>
+                                <div class="btn-group">
+                                    <button type="button" class="btn btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
+                                        <i class="fas fa-ellipsis-h"></i>
+                                    </button>
+                                    <ul class="dropdown-menu dropdown-menu-end">
+                                        <li>
+                                            <button class="dropdown-item report-export-btn" data-report-id="{{ report.id }}" data-export-type="pdf">
+                                                <i class="fas fa-file-pdf me-2"></i> Export as PDF
+                                            </button>
+                                        </li>
+                                        <li>
+                                            <button class="dropdown-item report-export-btn" data-report-id="{{ report.id }}" data-export-type="csv">
+                                                <i class="fas fa-file-csv me-2"></i> Export as CSV
+                                            </button>
+                                        </li>
+                                        <li><hr class="dropdown-divider"></li>
+                                        <li>
+                                            <button class="dropdown-item report-share-btn" data-report-id="{{ report.id }}" data-report-title="{{ report.title }}">
+                                                <i class="fas fa-share-alt me-2"></i> Share Report
+                                            </button>
+                                        </li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            {% endfor %}
+        {% else %}
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-body text-center py-5">
+                        <i class="fas fa-file-alt fa-4x text-muted mb-3"></i>
+                        <h4>No Reports Found</h4>
+                        <p class="text-muted">You haven't generated any security reports yet.</p>
+                        <a href="{{ url_for('devices') }}" class="btn btn-primary mt-2">
+                            <i class="fas fa-shield-alt me-2"></i>Scan Devices
+                        </a>
+                    </div>
+                </div>
+            </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Report Preview Modal -->
+<div class="modal fade" id="reportPreviewModal" tabindex="-1" aria-labelledby="reportPreviewModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="reportPreviewModalLabel">Report Preview</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <!-- Content will be loaded dynamically -->
+                <div class="text-center py-5">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                    <p class="mt-3">Loading report preview...</p>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Share Report Modal -->
+<div class="modal fade" id="shareReportModal" tabindex="-1" aria-labelledby="shareReportModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="shareReportModalLabel">Share Report</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label for="reportShareLink" class="form-label">Report Link</label>
+                    <div class="input-group">
+                        <input type="text" class="form-control" id="reportShareLink" readonly>
+                        <button class="btn btn-outline-primary" type="button" id="copyReportLinkBtn">Copy</button>
+                    </div>
+                    <div class="form-text">Anyone with this link can view the report.</div>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Share via</label>
+                    <div class="d-flex justify-content-around">
+                        <button class="btn btn-outline-primary">
+                            <i class="fas fa-envelope fa-lg"></i>
+                        </button>
+                        <button class="btn btn-outline-primary">
+                            <i class="fab fa-slack fa-lg"></i>
+                        </button>
+                        <button class="btn btn-outline-primary">
+                            <i class="fab fa-teams fa-lg"></i>
+                        </button>
+                        <button class="btn btn-outline-primary">
+                            <i class="fab fa-twitter fa-lg"></i>
+                        </button>
+                        <button class="btn btn-outline-primary">
+                            <i class="fab fa-linkedin fa-lg"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Export Success Toast -->
+<div class="position-fixed bottom-0 end-0 p-3" style="z-index: 11">
+    <div id="exportSuccessToast" class="toast" role="alert" aria-live="assertive" aria-atomic="true">
+        <div class="toast-header">
+            <i class="fas fa-check-circle text-success me-2"></i>
+            <strong class="me-auto">Success</strong>
+            <button type="button" class="btn-close" data-bs-dismiss="toast" aria-label="Close"></button>
+        </div>
+        <div class="toast-body">
+            Report exported successfully!
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/reports.js') }}"></script>
+{% endblock %}

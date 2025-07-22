@@ -1,0 +1,853 @@
+{% extends "layout.html" %}
+
+{% block title %}PrivIoT - Vulnerability Remediation{% endblock %}
+
+{% block head %}
+<style>
+    .vulnerability-card {
+        transition: all 0.2s ease-in-out;
+        margin-bottom: 1.5rem;
+    }
+    
+    .vulnerability-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 8px 15px rgba(0, 0, 0, 0.1);
+    }
+    
+    .severity-badge {
+        display: inline-block;
+        padding: 0.35em 0.65em;
+        font-size: 0.75em;
+        font-weight: 700;
+        line-height: 1;
+        text-align: center;
+        white-space: nowrap;
+        vertical-align: baseline;
+        border-radius: 0.375rem;
+    }
+    
+    .severity-critical {
+        background-color: #dc3545;
+        color: white;
+    }
+    
+    .severity-high {
+        background-color: #fd7e14;
+        color: white;
+    }
+    
+    .severity-medium {
+        background-color: #ffc107;
+        color: black;
+    }
+    
+    .severity-low {
+        background-color: #28a745;
+        color: white;
+    }
+    
+    .remediation-steps {
+        border-left: 3px solid #6c757d;
+        padding-left: 1rem;
+        margin-top: 1rem;
+        margin-bottom: 1rem;
+    }
+    
+    .remediation-steps li {
+        margin-bottom: 0.5rem;
+    }
+    
+    .status-badge {
+        display: inline-block;
+        padding: 0.35em 0.65em;
+        font-size: 0.75em;
+        font-weight: 700;
+        line-height: 1;
+        text-align: center;
+        white-space: nowrap;
+        vertical-align: baseline;
+        border-radius: 0.375rem;
+    }
+    
+    .status-open {
+        background-color: #6c757d;
+        color: white;
+    }
+    
+    .status-in-progress {
+        background-color: #0d6efd;
+        color: white;
+    }
+    
+    .status-resolved {
+        background-color: #28a745;
+        color: white;
+    }
+    
+    .status-false-positive {
+        background-color: #6c757d;
+        color: white;
+    }
+    
+    .vulnerability-detail {
+        margin-bottom: 1rem;
+    }
+    
+    .vulnerability-detail label {
+        font-weight: 600;
+    }
+    
+    .device-badge {
+        background-color: #0dcaf0;
+        color: #fff;
+        font-size: 0.8rem;
+        border-radius: 0.375rem;
+        padding: 0.25rem 0.5rem;
+        margin-right: 0.5rem;
+    }
+    
+    .cvss-info {
+        background-color: rgba(13, 110, 253, 0.1);
+        border-radius: 0.375rem;
+        padding: 1rem;
+        margin-top: 1rem;
+    }
+    
+    .auto-remediation-status {
+        margin-top: 1rem;
+        padding: 1rem;
+        border-radius: 0.375rem;
+    }
+    
+    .auto-remediation-status.success {
+        background-color: rgba(40, 167, 69, 0.1);
+        border: 1px solid rgba(40, 167, 69, 0.2);
+    }
+    
+    .auto-remediation-status.failure {
+        background-color: rgba(220, 53, 69, 0.1);
+        border: 1px solid rgba(220, 53, 69, 0.2);
+    }
+    
+    .manual-remediation {
+        margin-top: 1rem;
+    }
+    
+    .timeline {
+        position: relative;
+        margin: 0 0 30px 0;
+        padding: 0;
+        list-style: none;
+    }
+    
+    .timeline:before {
+        content: '';
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        width: 2px;
+        background: #dee2e6;
+        left: 20px;
+        margin-left: -1px;
+    }
+    
+    .timeline > li {
+        position: relative;
+        margin-bottom: 15px;
+    }
+    
+    .timeline > li:before,
+    .timeline > li:after {
+        content: " ";
+        display: table;
+    }
+    
+    .timeline > li:after {
+        clear: both;
+    }
+    
+    .timeline-icon {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        text-align: center;
+        position: absolute;
+        left: 0;
+        margin-left: -20px;
+        box-shadow: 0 0 0 5px #f8f9fa;
+        color: #fff;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    
+    .timeline-icon.bg-primary {
+        background-color: #0d6efd;
+    }
+    
+    .timeline-icon.bg-success {
+        background-color: #28a745;
+    }
+    
+    .timeline-icon.bg-danger {
+        background-color: #dc3545;
+    }
+    
+    .timeline-icon.bg-warning {
+        background-color: #ffc107;
+    }
+    
+    .timeline-icon.bg-info {
+        background-color: #0dcaf0;
+    }
+    
+    .timeline-body {
+        margin-left: 60px;
+        background-color: #f8f9fa;
+        border-radius: 0.375rem;
+        padding: 1rem;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+    }
+    
+    .timeline-date {
+        display: block;
+        color: #6c757d;
+        font-size: 0.85rem;
+        margin-bottom: 0.5rem;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container">
+    <h1 class="mb-4 animate__animated animate__fadeIn">
+        <i class="fas fa-shield-alt me-2"></i> Vulnerability Remediation
+    </h1>
+    
+    <div class="row">
+        <div class="col-lg-12">
+            <!-- Stats Overview -->
+            <div class="row mb-4">
+                <div class="col-md-3">
+                    <div class="card text-center animate__animated animate__fadeIn">
+                        <div class="card-body">
+                            <h6 class="card-title">Total Vulnerabilities</h6>
+                            <h2 class="card-text">{{ vulnerabilities|length }}</h2>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card text-center animate__animated animate__fadeIn" style="animation-delay: 0.1s;">
+                        <div class="card-body">
+                            <h6 class="card-title">Auto-Remediable</h6>
+                            <h2 class="card-text text-primary">{{ stats.auto_remediable }}</h2>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card text-center animate__animated animate__fadeIn" style="animation-delay: 0.2s;">
+                        <div class="card-body">
+                            <h6 class="card-title">In Progress</h6>
+                            <h2 class="card-text text-warning">{{ stats.in_progress }}</h2>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card text-center animate__animated animate__fadeIn" style="animation-delay: 0.3s;">
+                        <div class="card-body">
+                            <h6 class="card-title">Resolved</h6>
+                            <h2 class="card-text text-success">{{ stats.resolved }}</h2>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Filter Controls -->
+            <div class="card mb-4 animate__animated animate__fadeIn" style="animation-delay: 0.4s;">
+                <div class="card-body">
+                    <div class="row align-items-center">
+                        <div class="col-md-6">
+                            <h5 class="card-title">Filter Vulnerabilities</h5>
+                        </div>
+                        <div class="col-md-6 text-md-end">
+                            <button class="btn btn-primary" id="batchRemediateBtn">
+                                <i class="fas fa-magic me-2"></i> Batch Auto-Remediate
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="row mt-3">
+                        <div class="col-md-3">
+                            <div class="mb-3">
+                                <label for="deviceFilter" class="form-label">Device</label>
+                                <select class="form-select" id="deviceFilter">
+                                    <option value="">All Devices</option>
+                                    {% for device in devices %}
+                                    <option value="{{ device.id }}">{{ device.name }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="mb-3">
+                                <label for="severityFilter" class="form-label">Severity</label>
+                                <select class="form-select" id="severityFilter">
+                                    <option value="">All Severities</option>
+                                    <option value="critical">Critical</option>
+                                    <option value="high">High</option>
+                                    <option value="medium">Medium</option>
+                                    <option value="low">Low</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="mb-3">
+                                <label for="statusFilter" class="form-label">Status</label>
+                                <select class="form-select" id="statusFilter">
+                                    <option value="">All Statuses</option>
+                                    <option value="open">Open</option>
+                                    <option value="in_progress">In Progress</option>
+                                    <option value="resolved">Resolved</option>
+                                    <option value="false_positive">False Positive</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="mb-3">
+                                <label for="remediationFilter" class="form-label">Remediation</label>
+                                <select class="form-select" id="remediationFilter">
+                                    <option value="">All</option>
+                                    <option value="auto">Auto-Remediable</option>
+                                    <option value="manual">Manual Only</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Vulnerabilities List -->
+            <div class="vulnerabilities-container">
+                {% if vulnerabilities %}
+                    {% for vuln in vulnerabilities %}
+                    <div class="card vulnerability-card animate__animated animate__fadeIn" style="animation-delay: {{ loop.index * 0.1 }}s;">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <div>
+                                <h5 class="mb-0">{{ vuln.name }}</h5>
+                                <div>
+                                    <span class="severity-badge severity-{{ vuln.severity.lower() }}">{{ vuln.severity }}</span>
+                                    <span class="status-badge status-{{ vuln.status.lower().replace(' ', '-') }}">{{ vuln.status }}</span>
+                                    <span class="device-badge">{{ vuln.device.name }}</span>
+                                    <small class="text-muted">Detected: {{ vuln.detected_at }}</small>
+                                </div>
+                            </div>
+                            <div>
+                                {% if vuln.auto_remediable %}
+                                <button class="btn btn-primary btn-sm remediate-btn" data-vuln-id="{{ vuln.id }}">
+                                    <i class="fas fa-magic me-1"></i> Auto-Remediate
+                                </button>
+                                {% endif %}
+                                <button class="btn btn-outline-secondary btn-sm ms-2" type="button" data-bs-toggle="collapse" data-bs-target="#collapse{{ vuln.id }}" aria-expanded="false" aria-controls="collapse{{ vuln.id }}">
+                                    <i class="fas fa-chevron-down"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="collapse" id="collapse{{ vuln.id }}">
+                            <div class="card-body">
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <!-- Vulnerability Details -->
+                                        <div class="vulnerability-detail">
+                                            <label>Description:</label>
+                                            <p>{{ vuln.description }}</p>
+                                        </div>
+                                        
+                                        <div class="vulnerability-detail">
+                                            <label>CVSS Vector:</label>
+                                            <div class="cvss-info">
+                                                <p><strong>CVSS Score:</strong> {{ vuln.cvss_score }}</p>
+                                                <p><strong>Vector:</strong> <code>{{ vuln.cvss_vector }}</code></p>
+                                            </div>
+                                        </div>
+                                        
+                                        {% if vuln.status == 'resolved' %}
+                                        <div class="vulnerability-detail">
+                                            <label>Resolution:</label>
+                                            <p>{{ vuln.resolution_method }}</p>
+                                            <p><small class="text-muted">Resolved on: {{ vuln.resolved_at or 'Unknown' }}</small></p>
+                                        </div>
+                                        {% endif %}
+                                    </div>
+                                    
+                                    <div class="col-md-6">
+                                        <!-- Remediation Section -->
+                                        {% if vuln.auto_remediation_status %}
+                                        <div class="auto-remediation-status {{ 'success' if vuln.auto_remediation_status.success else 'failure' }}">
+                                            <h6>
+                                                {% if vuln.auto_remediation_status.success %}
+                                                <i class="fas fa-check-circle text-success me-1"></i> Automatic Remediation Successful
+                                                {% else %}
+                                                <i class="fas fa-times-circle text-danger me-1"></i> Automatic Remediation Failed
+                                                {% endif %}
+                                            </h6>
+                                            <p>{{ vuln.auto_remediation_status.message }}</p>
+                                        </div>
+                                        {% endif %}
+                                        
+                                        <div class="manual-remediation">
+                                            <h6><i class="fas fa-tools me-1"></i> Manual Remediation Steps</h6>
+                                            <ol class="remediation-steps">
+                                                {% if vuln.manual_steps %}
+                                                    {% for step in vuln.manual_steps %}
+                                                    <li>{{ step }}</li>
+                                                    {% endfor %}
+                                                {% else %}
+                                                <li>Review the vulnerability details carefully.</li>
+                                                <li>Consult the device manufacturer's documentation for security best practices.</li>
+                                                <li>Implement the recommended security controls to address the vulnerability.</li>
+                                                <li>After remediation, re-scan the device to verify the vulnerability has been fixed.</li>
+                                                {% endif %}
+                                            </ol>
+                                        </div>
+                                        
+                                        {% if vuln.status != 'resolved' %}
+                                        <div class="d-flex justify-content-end mt-3">
+                                            <button class="btn btn-outline-primary btn-sm me-2 manual-remediate-btn" data-vuln-id="{{ vuln.id }}">
+                                                <i class="fas fa-check me-1"></i> Mark as Manually Remediated
+                                            </button>
+                                            
+                                            <button class="btn btn-outline-secondary btn-sm false-positive-btn" data-vuln-id="{{ vuln.id }}">
+                                                <i class="fas fa-ban me-1"></i> Mark as False Positive
+                                            </button>
+                                        </div>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                                
+                                <!-- Remediation Timeline (for vulnerabilities with history) -->
+                                {% if vuln.timeline %}
+                                <div class="mt-4">
+                                    <h6><i class="fas fa-history me-1"></i> Remediation Timeline</h6>
+                                    <ul class="timeline">
+                                        {% for event in vuln.timeline %}
+                                        <li>
+                                            <div class="timeline-icon bg-{{ event.icon }}">
+                                                <i class="fas fa-{{ event.icon_class }}"></i>
+                                            </div>
+                                            <div class="timeline-body">
+                                                <span class="timeline-date">{{ event.timestamp }}</span>
+                                                <h6>{{ event.title }}</h6>
+                                                <p>{{ event.description }}</p>
+                                            </div>
+                                        </li>
+                                        {% endfor %}
+                                    </ul>
+                                </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                {% else %}
+                    <div class="text-center p-5 animate__animated animate__fadeIn">
+                        <i class="fas fa-shield-alt fa-4x text-muted mb-3"></i>
+                        <h3>No Vulnerabilities Found</h3>
+                        <p class="text-muted">All of your devices appear to be secure. Run a new scan to check for vulnerabilities.</p>
+                        <button class="btn btn-primary mt-3">
+                            <i class="fas fa-search me-1"></i> Run a New Scan
+                        </button>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Add CSRF token to all AJAX requests
+    function getCsrfToken() {
+        return document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+    }
+    
+    document.addEventListener('DOMContentLoaded', function() {
+        // Handle auto-remediate buttons
+        const remediateButtons = document.querySelectorAll('.remediate-btn');
+        remediateButtons.forEach(button => {
+            button.addEventListener('click', function() {
+                const vulnId = this.getAttribute('data-vuln-id');
+                
+                // Disable button and show progress
+                this.disabled = true;
+                this.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i> Remediating...';
+                
+                // Make an AJAX call to the remediation API
+                fetch(`/api/remediate/${vulnId}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': getCsrfToken()
+                    },
+                    credentials: 'same-origin'
+                })
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('Network response was not ok');
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    // Update UI based on remediation result
+                    updateRemediationUI(this, data);
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    
+                    // Show error message
+                    const flashMessage = `
+                        <div class="alert alert-danger alert-dismissible fade show animate__animated animate__fadeIn" role="alert">
+                            Error during remediation: ${error.message}
+                            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                        </div>
+                    `;
+                    document.querySelector('.container').insertAdjacentHTML('afterbegin', flashMessage);
+                    
+                    // Reset button
+                    this.disabled = false;
+                    this.innerHTML = '<i class="fas fa-magic me-1"></i> Retry Auto-Remediate';
+                });
+            });
+        });
+        
+        // Function to update UI based on remediation result
+        function updateRemediationUI(button, data) {
+            const card = button.closest('.vulnerability-card');
+            if (!card) return; // Safety check
+            
+            // Open the collapse if it's closed to show details
+            const collapseEl = card.querySelector('.collapse');
+            if (collapseEl) {
+                const collapse = new bootstrap.Collapse(collapseEl, {
+                    show: true
+                });
+            }
+            
+            // Create remediation status element
+            const remediationStatusDiv = document.createElement('div');
+            if (data.success) {
+                remediationStatusDiv.className = 'auto-remediation-status success';
+                remediationStatusDiv.innerHTML = `
+                    <h6>
+                        <i class="fas fa-check-circle text-success me-1"></i> Automatic Remediation Successful
+                    </h6>
+                    <p>${data.message || 'The vulnerability has been successfully remediated.'}</p>
+                `;
+                
+                // Update status badge
+                const statusBadge = card.querySelector('.status-badge');
+                if (statusBadge) {
+                    statusBadge.className = 'status-badge status-resolved';
+                    statusBadge.textContent = 'Resolved';
+                }
+                
+                // Show success message
+                const flashMessage = `
+                    <div class="alert alert-success alert-dismissible fade show animate__animated animate__fadeIn" role="alert">
+                        Successfully remediated vulnerability "${card.querySelector('h5').textContent}".
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                    </div>
+                `;
+                document.querySelector('.container').insertAdjacentHTML('afterbegin', flashMessage);
+                
+                // Update button state
+                button.disabled = true;
+                button.innerHTML = '<i class="fas fa-check me-1"></i> Remediated';
+                button.className = 'btn btn-success btn-sm';
+            } else {
+                // Handle failed remediation
+                remediationStatusDiv.className = 'auto-remediation-status failure';
+                remediationStatusDiv.innerHTML = `
+                    <h6>
+                        <i class="fas fa-times-circle text-danger me-1"></i> Automatic Remediation Failed
+                    </h6>
+                    <p>${data.message || 'Remediation failed. Please follow the manual remediation steps.'}</p>
+                `;
+                
+                // Show manual steps if provided
+                if (data.manual_steps && data.manual_steps.length > 0) {
+                    remediationStatusDiv.innerHTML += `
+                        <div class="mt-2">
+                            <h6>Manual Remediation Steps:</h6>
+                            <ol class="remediation-steps">
+                                ${data.manual_steps.map(step => `<li>${step}</li>`).join('')}
+                            </ol>
+                        </div>
+                    `;
+                }
+                
+                // Show warning message
+                const flashMessage = `
+                    <div class="alert alert-warning alert-dismissible fade show animate__animated animate__fadeIn" role="alert">
+                        Automatic remediation failed for vulnerability "${card.querySelector('h5').textContent}". Please follow manual steps.
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                    </div>
+                `;
+                document.querySelector('.container').insertAdjacentHTML('afterbegin', flashMessage);
+                
+                // Reset button
+                button.disabled = false;
+                button.innerHTML = '<i class="fas fa-magic me-1"></i> Retry Auto-Remediate';
+            }
+            
+            // Insert the remediation status into the UI
+            const existingStatus = card.querySelector('.auto-remediation-status');
+            if (existingStatus) {
+                existingStatus.replaceWith(remediationStatusDiv);
+            } else {
+                const rightColumn = card.querySelector('.col-md-6:nth-child(2)');
+                if (rightColumn) {
+                    rightColumn.insertBefore(remediationStatusDiv, rightColumn.firstChild);
+                }
+            }
+            
+            // Add to timeline if vulnerability has a timeline section
+            addToTimeline(card, data);
+        }
+        
+        // Function to add remediation attempt to timeline if one exists
+        function addToTimeline(card, data) {
+            const timelineContainer = card.querySelector('.timeline');
+            if (!timelineContainer) return;
+            
+            const now = new Date().toLocaleString();
+            const timelineItem = document.createElement('li');
+            
+            if (data.success) {
+                timelineItem.innerHTML = `
+                    <div class="timeline-icon bg-success">
+                        <i class="fas fa-check"></i>
+                    </div>
+                    <div class="timeline-body">
+                        <span class="timeline-date">${now}</span>
+                        <h6>Automatic Remediation Successful</h6>
+                        <p>${data.message || 'The vulnerability was successfully remediated.'}</p>
+                    </div>
+                `;
+            } else {
+                timelineItem.innerHTML = `
+                    <div class="timeline-icon bg-warning">
+                        <i class="fas fa-times"></i>
+                    </div>
+                    <div class="timeline-body">
+                        <span class="timeline-date">${now}</span>
+                        <h6>Automatic Remediation Attempted</h6>
+                        <p>${data.message || 'Remediation failed. Manual steps required.'}</p>
+                    </div>
+                `;
+            }
+            
+            // Add to timeline
+            timelineContainer.insertBefore(timelineItem, timelineContainer.firstChild);
+        }
+        
+        // Helper function already defined at the top
+        
+        // Handle manual remediation buttons
+        const manualRemediateButtons = document.querySelectorAll('.manual-remediate-btn');
+        manualRemediateButtons.forEach(button => {
+            button.addEventListener('click', function() {
+                const vulnId = this.getAttribute('data-vuln-id');
+                
+                // In a real app, this would make an AJAX call to update the vulnerability status
+                console.log('Marking vulnerability as manually remediated:', vulnId);
+                
+                // Update UI to show remediation status
+                const card = this.closest('.vulnerability-card');
+                
+                // Update status badge
+                const statusBadge = card.querySelector('.status-badge');
+                statusBadge.className = 'status-badge status-resolved';
+                statusBadge.textContent = 'Resolved';
+                
+                // Disable buttons
+                this.disabled = true;
+                const falsePositiveBtn = card.querySelector('.false-positive-btn');
+                if (falsePositiveBtn) falsePositiveBtn.disabled = true;
+                
+                // Show flash message
+                const flashMessage = `
+                    <div class="alert alert-success alert-dismissible fade show animate__animated animate__fadeIn" role="alert">
+                        Vulnerability "${card.querySelector('h5').textContent}" has been marked as resolved.
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                    </div>
+                `;
+                document.querySelector('.container').insertAdjacentHTML('afterbegin', flashMessage);
+            });
+        });
+        
+        // Handle false positive buttons
+        const falsePositiveButtons = document.querySelectorAll('.false-positive-btn');
+        falsePositiveButtons.forEach(button => {
+            button.addEventListener('click', function() {
+                const vulnId = this.getAttribute('data-vuln-id');
+                
+                // In a real app, this would make an AJAX call to update the vulnerability status
+                console.log('Marking vulnerability as false positive:', vulnId);
+                
+                // Update UI to show false positive status
+                const card = this.closest('.vulnerability-card');
+                
+                // Update status badge
+                const statusBadge = card.querySelector('.status-badge');
+                statusBadge.className = 'status-badge status-false-positive';
+                statusBadge.textContent = 'False Positive';
+                
+                // Disable buttons
+                this.disabled = true;
+                const manualRemediateBtn = card.querySelector('.manual-remediate-btn');
+                if (manualRemediateBtn) manualRemediateBtn.disabled = true;
+                
+                // Show flash message
+                const flashMessage = `
+                    <div class="alert alert-info alert-dismissible fade show animate__animated animate__fadeIn" role="alert">
+                        Vulnerability "${card.querySelector('h5').textContent}" has been marked as a false positive.
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                    </div>
+                `;
+                document.querySelector('.container').insertAdjacentHTML('afterbegin', flashMessage);
+            });
+        });
+        
+        // Handle batch remediation button
+        const batchRemediateBtn = document.getElementById('batchRemediateBtn');
+        if (batchRemediateBtn) {
+            batchRemediateBtn.addEventListener('click', function() {
+                // Get all checked and auto-remediable vulnerabilities
+                const autoRemediableVulns = Array.from(document.querySelectorAll('.vulnerability-card'))
+                    .filter(card => {
+                        // Filter based on current filters and auto-remediable status
+                        const isAutoRemediable = !!card.querySelector('.remediate-btn');
+                        const isNotResolved = !card.querySelector('.status-badge.status-resolved');
+                        return isAutoRemediable && isNotResolved;
+                    })
+                    .map(card => {
+                        const btn = card.querySelector('.remediate-btn');
+                        return btn ? btn.getAttribute('data-vuln-id') : null;
+                    })
+                    .filter(id => id !== null);
+                
+                if (autoRemediableVulns.length === 0) {
+                    // Show message if no eligible vulnerabilities
+                    const flashMessage = `
+                        <div class="alert alert-info alert-dismissible fade show animate__animated animate__fadeIn" role="alert">
+                            No eligible vulnerabilities found for batch remediation. Only open, auto-remediable vulnerabilities can be processed.
+                            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                        </div>
+                    `;
+                    document.querySelector('.container').insertAdjacentHTML('afterbegin', flashMessage);
+                    return;
+                }
+                
+                // Confirm batch remediation
+                if (!confirm(`Are you sure you want to attempt batch remediation for ${autoRemediableVulns.length} vulnerabilities? This operation may take some time and could impact device performance.`)) {
+                    return;
+                }
+                
+                // Disable button and show progress
+                this.disabled = true;
+                this.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i> Processing...';
+                
+                // Show progress message
+                const progressMessage = `
+                    <div class="alert alert-info alert-dismissible fade show animate__animated animate__fadeIn" id="batch-progress-alert" role="alert">
+                        <i class="fas fa-sync fa-spin me-2"></i>
+                        Batch remediation in progress. Attempting to remediate ${autoRemediableVulns.length} vulnerabilities...
+                    </div>
+                `;
+                document.querySelector('.container').insertAdjacentHTML('afterbegin', progressMessage);
+                
+                // Make an AJAX call to batch remediate vulnerabilities
+                fetch('/api/batch-remediate', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': getCsrfToken()
+                    },
+                    body: JSON.stringify({
+                        vulnerability_ids: autoRemediableVulns
+                    }),
+                    credentials: 'same-origin'
+                })
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('Network response was not ok');
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    // Remove progress message
+                    const progressAlert = document.getElementById('batch-progress-alert');
+                    if (progressAlert) progressAlert.remove();
+                    
+                    // Update UI for each remediated vulnerability
+                    if (data.details && data.details.length > 0) {
+                        data.details.forEach(detail => {
+                            if (detail.status === 'success') {
+                                const vulnId = detail.vulnerability_id;
+                                const button = document.querySelector(`.remediate-btn[data-vuln-id="${vulnId}"]`);
+                                if (button) {
+                                    updateRemediationUI(button, detail.result);
+                                }
+                            }
+                        });
+                    }
+                    
+                    // Show result message
+                    const resultMessage = `
+                        <div class="alert alert-${data.successful > 0 ? 'success' : 'warning'} alert-dismissible fade show animate__animated animate__fadeIn" role="alert">
+                            <strong>Batch remediation complete.</strong> 
+                            ${data.successful} of ${data.total} vulnerabilities were automatically fixed.
+                            ${data.failed > 0 ? `${data.failed} vulnerabilities could not be remediated automatically.` : ''}
+                            ${data.skipped > 0 ? `${data.skipped} vulnerabilities were skipped.` : ''}
+                            Please review individual vulnerabilities for details.
+                            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                        </div>
+                    `;
+                    document.querySelector('.container').insertAdjacentHTML('afterbegin', resultMessage);
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    
+                    // Remove progress message
+                    const progressAlert = document.getElementById('batch-progress-alert');
+                    if (progressAlert) progressAlert.remove();
+                    
+                    // Show error message
+                    const flashMessage = `
+                        <div class="alert alert-danger alert-dismissible fade show animate__animated animate__fadeIn" role="alert">
+                            Batch remediation failed: ${error.message}
+                            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                        </div>
+                    `;
+                    document.querySelector('.container').insertAdjacentHTML('afterbegin', flashMessage);
+                })
+                .finally(() => {
+                    // Reset button state
+                    this.disabled = false;
+                    this.innerHTML = '<i class="fas fa-magic me-1"></i> Batch Auto-Remediate';
+                });
+            });
+        }
+        
+        // Handle filters (in a real app, this would trigger an AJAX request)
+        const filters = document.querySelectorAll('#deviceFilter, #severityFilter, #statusFilter, #remediationFilter');
+        filters.forEach(filter => {
+            filter.addEventListener('change', function() {
+                console.log('Filter changed:', this.id, 'value:', this.value);
+                // In a real app, this would trigger an AJAX request to filter vulnerabilities
+            });
+        });
+    });
+</script>
+{% endblock %}

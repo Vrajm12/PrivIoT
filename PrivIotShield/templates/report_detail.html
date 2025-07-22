@@ -1,0 +1,190 @@
+{% extends "layout.html" %}
+
+{% block title %}{{ report.title }} - PrivIoT{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row mb-4">
+        <div class="col-12">
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb">
+                    <li class="breadcrumb-item"><a href="{{ url_for('dashboard') }}">Dashboard</a></li>
+                    <li class="breadcrumb-item"><a href="{{ url_for('reports') }}">Reports</a></li>
+                    <li class="breadcrumb-item active">{{ report.title }}</li>
+                </ol>
+            </nav>
+            
+            <div class="d-flex justify-content-between align-items-center">
+                <h1 class="mb-0">
+                    <i class="fas fa-file-alt me-2"></i>{{ report.title }}
+                </h1>
+                
+                <div class="btn-group">
+                    <button type="button" class="btn btn-primary dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
+                        <i class="fas fa-download me-1"></i> Export
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-end">
+                        <li>
+                            <button class="dropdown-item report-export-btn" data-report-id="{{ report.id }}" data-export-type="pdf">
+                                <i class="fas fa-file-pdf me-2"></i> Export as PDF
+                            </button>
+                        </li>
+                        <li>
+                            <button class="dropdown-item report-export-btn" data-report-id="{{ report.id }}" data-export-type="csv">
+                                <i class="fas fa-file-csv me-2"></i> Export as CSV
+                            </button>
+                        </li>
+                        <li><hr class="dropdown-divider"></li>
+                        <li>
+                            <button class="dropdown-item report-share-btn" data-report-id="{{ report.id }}" data-report-title="{{ report.title }}">
+                                <i class="fas fa-share-alt me-2"></i> Share Report
+                            </button>
+                        </li>
+                        <li>
+                            <a href="{{ url_for('scan_detail', scan_id=report.scan_id) }}" class="dropdown-item">
+                                <i class="fas fa-shield-alt me-2"></i> View Scan Details
+                            </a>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+            
+            <div class="text-muted mt-2">
+                <span><strong>Generated:</strong> {{ report.generated_at.strftime('%Y-%m-%d %H:%M') }}</span>
+                <span class="mx-3">|</span>
+                <span><strong>Device:</strong> {{ report.scan.device.name }}</span>
+                <span class="mx-3">|</span>
+                <span><strong>Report Type:</strong> {{ report.report_type|capitalize }}</span>
+            </div>
+        </div>
+    </div>
+    
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-body">
+                    <!-- Report content from AI-generated HTML -->
+                    {{ report.content }}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Share Report Modal -->
+<div class="modal fade" id="shareReportModal" tabindex="-1" aria-labelledby="shareReportModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="shareReportModalLabel">Share Report</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label for="reportShareLink" class="form-label">Report Link</label>
+                    <div class="input-group">
+                        <input type="text" class="form-control" id="reportShareLink" value="{{ request.url_root }}report/{{ report.id }}?share=true" readonly>
+                        <button class="btn btn-outline-primary" type="button" id="copyReportLinkBtn">Copy</button>
+                    </div>
+                    <div class="form-text">Anyone with this link can view the report.</div>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Share via</label>
+                    <div class="d-flex justify-content-around">
+                        <button class="btn btn-outline-primary">
+                            <i class="fas fa-envelope fa-lg"></i>
+                        </button>
+                        <button class="btn btn-outline-primary">
+                            <i class="fab fa-slack fa-lg"></i>
+                        </button>
+                        <button class="btn btn-outline-primary">
+                            <i class="fab fa-teams fa-lg"></i>
+                        </button>
+                        <button class="btn btn-outline-primary">
+                            <i class="fab fa-twitter fa-lg"></i>
+                        </button>
+                        <button class="btn btn-outline-primary">
+                            <i class="fab fa-linkedin fa-lg"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Export Success Toast -->
+<div class="position-fixed bottom-0 end-0 p-3" style="z-index: 11">
+    <div id="exportSuccessToast" class="toast" role="alert" aria-live="assertive" aria-atomic="true">
+        <div class="toast-header">
+            <i class="fas fa-check-circle text-success me-2"></i>
+            <strong class="me-auto">Success</strong>
+            <button type="button" class="btn-close" data-bs-dismiss="toast" aria-label="Close"></button>
+        </div>
+        <div class="toast-body">
+            Report exported successfully!
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/reports.js') }}"></script>
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Setup share functionality
+        const shareBtn = document.querySelector('.report-share-btn');
+        if (shareBtn) {
+            shareBtn.addEventListener('click', function() {
+                const modal = new bootstrap.Modal(document.getElementById('shareReportModal'));
+                modal.show();
+            });
+        }
+        
+        // Setup copy link button
+        const copyLinkBtn = document.getElementById('copyReportLinkBtn');
+        if (copyLinkBtn) {
+            copyLinkBtn.addEventListener('click', function() {
+                const linkInput = document.getElementById('reportShareLink');
+                if (linkInput) {
+                    linkInput.select();
+                    document.execCommand('copy');
+                    
+                    // Change button text temporarily
+                    const originalText = this.textContent;
+                    this.textContent = 'Copied!';
+                    
+                    setTimeout(() => {
+                        this.textContent = originalText;
+                    }, 2000);
+                }
+            });
+        }
+        
+        // Setup export buttons
+        const exportButtons = document.querySelectorAll('.report-export-btn');
+        exportButtons.forEach(button => {
+            button.addEventListener('click', function() {
+                // Show loading state
+                const originalText = this.innerHTML;
+                this.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Exporting...';
+                this.disabled = true;
+                
+                // In a real app, this would be an API call to export the report
+                // For this demo, we'll simulate it with a timeout
+                setTimeout(() => {
+                    this.innerHTML = originalText;
+                    this.disabled = false;
+                    
+                    // Show success message
+                    const toast = new bootstrap.Toast(document.getElementById('exportSuccessToast'));
+                    toast.show();
+                }, 2000);
+            });
+        });
+    });
+</script>
+{% endblock %}
