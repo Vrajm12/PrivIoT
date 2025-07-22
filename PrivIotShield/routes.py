@@ -1,14 +1,33 @@
 import os
 import json
 import uuid
-from datetime import datetime
-from flask import render_template, redirect, url_for, flash, request, jsonify, abort, session
+from datetime import datetime, timedelta
+from flask import render_template, redirect, url_for, flash, request, jsonify, abort, session, current_app
 from flask_login import login_user, logout_user, login_required, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
 from app import app, db, csrf
-from models import User, Device, Scan, Vulnerability, PrivacyIssue, Report
+from models import User, Device, Scan, Vulnerability, PrivacyIssue, Report, UserActivity, DeviceGroup
 from security_scanner import scan_device
 from report_generator import generate_report
+from sqlalchemy import func, desc
+
+
+def log_user_activity(activity_type, activity_data=None):
+    """Log user activity for analytics and security"""
+    if current_user.is_authenticated:
+        try:
+            activity = UserActivity(
+                user_id=current_user.id,
+                activity_type=activity_type,
+                activity_data=json.dumps(activity_data) if activity_data else None,
+                ip_address=request.remote_addr,
+                user_agent=request.headers.get('User-Agent', '')[:255]
+            )
+            db.session.add(activity)
+            db.session.commit()
+        except Exception as e:
+            app.logger.error(f"Failed to log user activity: {str(e)}")
+            db.session.rollback()
 
 
 @app.route('/')
@@ -30,11 +49,17 @@ def login():
         user = User.query.filter_by(username=username).first()
         
         if user and check_password_hash(user.password_hash, password):
+            # Update last login time
+            user.last_login = datetime.utcnow()
+            db.session.commit()
+            
             login_user(user, remember=True)
+            log_user_activity('login')
             next_page = request.args.get('next')
             flash('Login successful!', 'success')
             return redirect(next_page or url_for('dashboard'))
         else:
+            log_user_activity('failed_login', {'username': username})
             flash('Login unsuccessful. Please check your username and password.', 'danger')
     
     return render_template('login.html')
@@ -72,6 +97,7 @@ def register():
             )
             db.session.add(new_user)
             db.session.commit()
+            log_user_activity('registration', {'username': username})
             flash('Account created successfully! You can now log in.', 'success')
             return redirect(url_for('login'))
     
@@ -81,6 +107,7 @@ def register():
 @app.route('/logout')
 @login_required
 def logout():
+    log_user_activity('logout')
     logout_user()
     flash('You have been logged out.', 'info')
     return redirect(url_for('index'))
@@ -89,6 +116,8 @@ def logout():
 @app.route('/dashboard')
 @login_required
 def dashboard():
+    log_user_activity('dashboard_view')
+    
     # Get user's devices
     devices = Device.query.filter_by(user_id=current_user.id).all()
     
@@ -113,6 +142,22 @@ def dashboard():
         Vulnerability.status == 'open'
     ).limit(5).all()
     
+    # Get security trends (last 30 days)
+    security_trend = db.session.query(
+        func.date(Scan.scan_date).label('date'),
+        func.avg(Scan.security_score).label('avg_score')
+    ).filter(
+        Scan.user_id == current_user.id,
+        Scan.status == 'completed',
+        Scan.scan_date >= datetime.utcnow() - timedelta(days=30)
+    ).group_by(func.date(Scan.scan_date)).all()
+    
+    # Get device groups
+    device_groups = DeviceGroup.query.filter_by(user_id=current_user.id).all()
+    
+    # Get recommendations based on current vulnerabilities
+    recommendations = _generate_dashboard_recommendations(devices, critical_vulnerabilities)
+    
     return render_template('dashboard.html', 
                           devices=devices,
                           recent_scans=recent_scans,
@@ -120,13 +165,18 @@ def dashboard():
                           vulnerable_devices=vulnerable_devices,
                           avg_security_score=avg_security_score,
                           avg_privacy_score=avg_privacy_score,
-                          critical_vulnerabilities=critical_vulnerabilities)
+                          critical_vulnerabilities=critical_vulnerabilities,
+                          security_trend=security_trend,
+                          device_groups=device_groups,
+                          recommendations=recommendations)
 
 
 @app.route('/devices', methods=['GET', 'POST'])
 @login_required
 def devices():
     if request.method == 'POST':
+        log_user_activity('device_add')
+        
         name = request.form.get('name')
         device_type = request.form.get('device_type')
         manufacturer = request.form.get('manufacturer')
@@ -136,29 +186,45 @@ def devices():
         mac_address = request.form.get('mac_address')
         location = request.form.get('location')
         description = request.form.get('description')
+        group_id = request.form.get('group_id')
         
         if not name or not device_type:
             flash('Device name and type are required.', 'danger')
         else:
-            new_device = Device(
-                name=name,
-                device_type=device_type,
-                manufacturer=manufacturer,
-                model=model,
-                firmware_version=firmware_version,
-                ip_address=ip_address,
-                mac_address=mac_address,
-                location=location,
-                description=description,
-                user_id=current_user.id
-            )
-            db.session.add(new_device)
-            db.session.commit()
-            flash('Device added successfully!', 'success')
-            return redirect(url_for('devices'))
+            try:
+                new_device = Device(
+                    name=name,
+                    device_type=device_type,
+                    manufacturer=manufacturer,
+                    model=model,
+                    firmware_version=firmware_version,
+                    ip_address=ip_address,
+                    mac_address=mac_address,
+                    location=location,
+                    description=description,
+                    user_id=current_user.id
+                )
+                db.session.add(new_device)
+                db.session.flush()  # Get the device ID
+                
+                # Add to group if specified
+                if group_id:
+                    group = DeviceGroup.query.filter_by(id=group_id, user_id=current_user.id).first()
+                    if group:
+                        new_device.groups.append(group)
+                
+                db.session.commit()
+                flash('Device added successfully!', 'success')
+                return redirect(url_for('devices'))
+            except Exception as e:
+                db.session.rollback()
+                app.logger.error(f"Error adding device: {str(e)}")
+                flash('Error adding device. Please try again.', 'danger')
     
     user_devices = Device.query.filter_by(user_id=current_user.id).all()
-    return render_template('devices.html', devices=user_devices)
+    device_groups = DeviceGroup.query.filter_by(user_id=current_user.id).all()
+    
+    return render_template('devices.html', devices=user_devices, device_groups=device_groups)
 
 
 @app.route('/device/<int:device_id>')
@@ -180,6 +246,8 @@ def device_detail(device_id):
 @app.route('/device/<int:device_id>/scan', methods=['POST'])
 @login_required
 def start_scan(device_id):
+    log_user_activity('scan_start', {'device_id': device_id})
+    
     device = Device.query.get_or_404(device_id)
     
     # Check if the device belongs to the current user
@@ -212,6 +280,8 @@ def start_scan(device_id):
         new_scan.privacy_score = scan_result.get('privacy_score', 0)
         new_scan.overall_score = (new_scan.security_score + new_scan.privacy_score) / 2
         new_scan.risk_level = scan_result.get('risk_level', 'medium')
+        new_scan.scan_duration = scan_result.get('scan_duration', 0)
+        new_scan.anomalies_detected = len(scan_result.get('anomalies', []))
         new_scan.scan_data = json.dumps(scan_result)
         
         # Add vulnerabilities from scan
@@ -223,8 +293,13 @@ def start_scan(device_id):
                 cvss_score=vuln.get('cvss_score', 0),
                 cvss_vector=vuln.get('cvss_vector', ''),
                 recommendation=vuln.get('recommendation', ''),
+                auto_remediable=vuln.get('auto_remediable', False),
+                remediation_complexity=vuln.get('remediation_complexity', 'medium'),
+                estimated_fix_time=vuln.get('estimated_fix_time', '30-60 minutes'),
                 scan_id=new_scan.id
             )
+            if vuln.get('remediation_steps'):
+                vulnerability.set_remediation_steps(vuln['remediation_steps'])
             db.session.add(vulnerability)
         
         # Add privacy issues from scan
@@ -235,16 +310,24 @@ def start_scan(device_id):
                 severity=issue.get('severity', 'medium'),
                 privacy_impact=issue.get('privacy_impact', 0),
                 recommendation=issue.get('recommendation', ''),
+                compliance_impact=json.dumps(issue.get('compliance_impact', [])),
                 scan_id=new_scan.id
             )
+            if issue.get('data_types_affected'):
+                privacy_issue.set_data_types_affected(issue['data_types_affected'])
             db.session.add(privacy_issue)
         
+        # Update device last scan date
+        device.last_scan_date = new_scan.scan_date
+        
         db.session.commit()
+        log_user_activity('scan_complete', {'device_id': device_id, 'scan_id': new_scan.id})
         flash('Scan completed successfully!', 'success')
         
     except Exception as e:
         new_scan.status = 'failed'
         db.session.commit()
+        log_user_activity('scan_failed', {'device_id': device_id, 'error': str(e)})
         flash(f'Scan failed: {str(e)}', 'danger')
     
     return redirect(url_for('scan_detail', scan_id=new_scan.id))
@@ -274,6 +357,8 @@ def scan_detail(scan_id):
 @app.route('/scan/<int:scan_id>/generate_report', methods=['POST'])
 @login_required
 def generate_scan_report(scan_id):
+    log_user_activity('report_generate', {'scan_id': scan_id})
+    
     scan = Scan.query.get_or_404(scan_id)
     
     # Check if the scan belongs to the current user
@@ -359,6 +444,98 @@ def profile():
     return render_template('profile.html', user=current_user)
 
 
+@app.route('/device_groups', methods=['GET', 'POST'])
+@login_required
+def device_groups():
+    """Manage device groups"""
+    if request.method == 'POST':
+        name = request.form.get('name')
+        description = request.form.get('description')
+        color = request.form.get('color', '#6366F1')
+        
+        if not name:
+            flash('Group name is required.', 'danger')
+        else:
+            try:
+                new_group = DeviceGroup(
+                    name=name,
+                    description=description,
+                    color=color,
+                    user_id=current_user.id
+                )
+                db.session.add(new_group)
+                db.session.commit()
+                flash('Device group created successfully!', 'success')
+                return redirect(url_for('device_groups'))
+            except Exception as e:
+                db.session.rollback()
+                app.logger.error(f"Error creating device group: {str(e)}")
+                flash('Error creating device group. Please try again.', 'danger')
+    
+    groups = DeviceGroup.query.filter_by(user_id=current_user.id).all()
+    return render_template('device_groups.html', groups=groups)
+
+
+@app.route('/recommendations')
+@login_required
+def recommendations():
+    """Show personalized security recommendations"""
+    log_user_activity('recommendations_view')
+    
+    # Get user's devices and recent scans
+    devices = Device.query.filter_by(user_id=current_user.id).all()
+    recent_scans = Scan.query.filter_by(user_id=current_user.id, status='completed').order_by(Scan.scan_date.desc()).limit(10).all()
+    
+    # Get open vulnerabilities
+    open_vulnerabilities = Vulnerability.query.join(Scan).filter(
+        Scan.user_id == current_user.id,
+        Vulnerability.status == 'open'
+    ).order_by(desc(Vulnerability.cvss_score)).all()
+    
+    # Generate personalized recommendations
+    recommendations = _generate_personalized_recommendations(devices, recent_scans, open_vulnerabilities)
+    
+    return render_template('recommendations.html', 
+                          recommendations=recommendations,
+                          devices=devices,
+                          open_vulnerabilities=open_vulnerabilities)
+
+
+@app.route('/api/vulnerability/<int:vuln_id>/status', methods=['POST'])
+@login_required
+@csrf.exempt
+def update_vulnerability_status(vuln_id):
+    """Update vulnerability status"""
+    try:
+        data = request.get_json()
+        new_status = data.get('status')
+        
+        if new_status not in ['open', 'resolved', 'false_positive']:
+            return jsonify({'error': 'Invalid status'}), 400
+        
+        vulnerability = Vulnerability.query.join(Scan).filter(
+            Vulnerability.id == vuln_id,
+            Scan.user_id == current_user.id
+        ).first()
+        
+        if not vulnerability:
+            return jsonify({'error': 'Vulnerability not found'}), 404
+        
+        vulnerability.status = new_status
+        if new_status == 'resolved':
+            vulnerability.resolved_at = datetime.utcnow()
+        
+        db.session.commit()
+        log_user_activity('vulnerability_status_update', {'vulnerability_id': vuln_id, 'status': new_status})
+        
+        return jsonify({'success': True, 'message': 'Status updated successfully'})
+        
+    except Exception as e:
+        db.session.rollback()
+        app.logger.error(f"Error updating vulnerability status: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+
 @app.route('/api_docs')
 @login_required
 def api_docs():
@@ -395,6 +572,138 @@ def inject_alerts_count():
 def toggle_theme():
     session['theme'] = 'light' if session.get('theme') == 'dark' else 'dark'
     return redirect(request.referrer or url_for('index'))
+
+
+def _generate_dashboard_recommendations(devices, critical_vulnerabilities):
+    """Generate dashboard recommendations based on user's current state"""
+    recommendations = []
+    
+    # No devices recommendation
+    if not devices:
+        recommendations.append({
+            'type': 'setup',
+            'title': 'Add Your First Device',
+            'description': 'Start securing your IoT ecosystem by adding your first device.',
+            'action': 'Add Device',
+            'url': url_for('devices'),
+            'priority': 'high'
+        })
+        return recommendations
+    
+    # Unscanned devices
+    unscanned_devices = [d for d in devices if not d.get_latest_scan()]
+    if unscanned_devices:
+        recommendations.append({
+            'type': 'scan',
+            'title': f'Scan {len(unscanned_devices)} Unscanned Device(s)',
+            'description': 'These devices haven\'t been scanned for security vulnerabilities yet.',
+            'action': 'Start Scanning',
+            'url': url_for('devices'),
+            'priority': 'medium'
+        })
+    
+    # Critical vulnerabilities
+    if critical_vulnerabilities:
+        recommendations.append({
+            'type': 'security',
+            'title': f'Fix {len(critical_vulnerabilities)} Critical Vulnerabilities',
+            'description': 'These vulnerabilities pose immediate security risks and should be addressed urgently.',
+            'action': 'View Vulnerabilities',
+            'url': url_for('remediation'),
+            'priority': 'critical'
+        })
+    
+    # Outdated scans
+    outdated_devices = [d for d in devices if d.get_latest_scan() and 
+                       (datetime.utcnow() - d.get_latest_scan().scan_date).days > 30]
+    if outdated_devices:
+        recommendations.append({
+            'type': 'maintenance',
+            'title': f'Update {len(outdated_devices)} Outdated Scan(s)',
+            'description': 'These devices haven\'t been scanned in over 30 days.',
+            'action': 'Rescan Devices',
+            'url': url_for('devices'),
+            'priority': 'low'
+        })
+    
+    return recommendations
+
+
+def _generate_personalized_recommendations(devices, recent_scans, open_vulnerabilities):
+    """Generate personalized security recommendations"""
+    recommendations = {
+        'immediate_actions': [],
+        'security_improvements': [],
+        'best_practices': [],
+        'device_specific': {}
+    }
+    
+    # Immediate actions for critical vulnerabilities
+    critical_vulns = [v for v in open_vulnerabilities if v.severity == 'critical']
+    for vuln in critical_vulns[:3]:  # Top 3 critical
+        recommendations['immediate_actions'].append({
+            'title': f'Fix Critical: {vuln.name}',
+            'description': vuln.description,
+            'device': vuln.scan.device.name,
+            'steps': vuln.get_remediation_steps(),
+            'estimated_time': vuln.estimated_fix_time,
+            'difficulty': vuln.remediation_complexity,
+            'priority': 1
+        })
+    
+    # Security improvements
+    if any(scan.security_score < 7.0 for scan in recent_scans):
+        recommendations['security_improvements'].append({
+            'title': 'Improve Overall Security Score',
+            'description': 'Your average security score could be improved by addressing medium and high severity vulnerabilities.',
+            'action': 'Review all vulnerabilities and prioritize fixes based on CVSS scores.'
+        })
+    
+    # Best practices
+    recommendations['best_practices'] = [
+        {
+            'title': 'Regular Security Scans',
+            'description': 'Scan your devices monthly to catch new vulnerabilities.',
+            'implementation': 'Set up a monthly reminder to run security scans on all devices.'
+        },
+        {
+            'title': 'Keep Firmware Updated',
+            'description': 'Regularly check for and install firmware updates.',
+            'implementation': 'Enable automatic updates where available, or check monthly for updates.'
+        },
+        {
+            'title': 'Network Segmentation',
+            'description': 'Isolate IoT devices on a separate network.',
+            'implementation': 'Configure a guest network or IoT VLAN for your smart devices.'
+        }
+    ]
+    
+    # Device-specific recommendations
+    for device in devices:
+        latest_scan = device.get_latest_scan()
+        if latest_scan and latest_scan.status == 'completed':
+            device_vulns = latest_scan.vulnerabilities.filter_by(status='open').all()
+            if device_vulns:
+                recommendations['device_specific'][device.name] = {
+                    'vulnerability_count': len(device_vulns),
+                    'top_priority': device_vulns[0] if device_vulns else None,
+                    'security_score': latest_scan.security_score,
+                    'recommended_action': _get_device_recommendation(device, latest_scan)
+                }
+    
+    return recommendations
+
+
+def _get_device_recommendation(device, scan):
+    """Get specific recommendation for a device based on its scan results"""
+    if scan.security_score < 4.0:
+        return f"Immediate attention required for {device.name}. Multiple critical vulnerabilities detected."
+    elif scan.security_score < 6.0:
+        return f"Address high-priority vulnerabilities on {device.name} to improve security."
+    elif scan.security_score < 8.0:
+        return f"{device.name} has good security but could be improved with minor fixes."
+    else:
+        return f"{device.name} has excellent security. Continue monitoring for new threats."
 
 
 @app.route('/alerts')
