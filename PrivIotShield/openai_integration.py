@@ -7,15 +7,20 @@ from openai import OpenAI
 # Configure logging
 logger = logging.getLogger(__name__)
 
-# OpenAI configuration
+# Get OpenAI API key from environment
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
-openai = OpenAI(api_key=OPENAI_API_KEY)
 
-# Log initialization status
+# Initialize OpenAI client only if API key is available
 if OPENAI_API_KEY:
-    logger.info("OpenAI client initialized successfully")
+    try:
+        openai = OpenAI(api_key=OPENAI_API_KEY)
+        logger.info("OpenAI client initialized successfully")
+    except Exception as e:
+        logger.error(f"Failed to initialize OpenAI client: {str(e)}")
+        openai = None
 else:
-    logger.warning("OpenAI API key not found. AI-powered features will be limited.")
+    logger.warning("OPENAI_API_KEY not found. AI analysis features will be disabled.")
+    openai = None
 
 def analyze_device_security_with_ai(device_data):
     """
@@ -27,9 +32,9 @@ def analyze_device_security_with_ai(device_data):
     Returns:
         dict: Analysis results including vulnerabilities and recommendations
     """
-    if not OPENAI_API_KEY:
-        logger.warning("OpenAI API key not configured. Using fallback security analysis.")
-        return fallback_security_analysis(device_data)
+    if not openai:
+        logger.warning("OpenAI client not available. Skipping AI analysis.")
+        return {"error": "OpenAI API key not configured", "analysis": None}
     
     try:
         # Format device data for the prompt
@@ -83,9 +88,9 @@ def analyze_privacy_risks_with_ai(device_data):
     Returns:
         dict: Analysis results including privacy issues and recommendations
     """
-    if not OPENAI_API_KEY:
-        logger.warning("OpenAI API key not configured. Using fallback privacy analysis.")
-        return fallback_privacy_analysis(device_data)
+    if not openai:
+        logger.warning("OpenAI client not available. Skipping AI analysis.")
+        return {"error": "OpenAI API key not configured", "risks": []}
     
     try:
         # Format device data for the prompt
@@ -140,9 +145,9 @@ def generate_security_recommendations_with_ai(vulnerabilities):
     Returns:
         dict: Recommendations for each vulnerability
     """
-    if not OPENAI_API_KEY:
-        logger.warning("OpenAI API key not configured. Using fallback recommendation generation.")
-        return fallback_recommendations(vulnerabilities)
+    if not openai:
+        logger.warning("OpenAI client not available. Skipping AI analysis.")
+        return {"error": "OpenAI API key not configured", "recommendations": []}
     
     try:
         # Format vulnerabilities for the prompt
@@ -197,9 +202,9 @@ def generate_report_with_ai(scan_data, report_type="detailed"):
     Returns:
         str: HTML formatted report content
     """
-    if not OPENAI_API_KEY:
-        logger.warning("OpenAI API key not configured. Using fallback report generation.")
-        return fallback_report_generation(scan_data, report_type)
+    if not openai:
+        logger.warning("OpenAI client not available. Skipping AI analysis.")
+        return {"error": "OpenAI API key not configured", "report": None}
     
     try:
         # Format scan data for the prompt

@@ -278,7 +278,7 @@
             <div class="alerts-container">
                 {% if alerts %}
                     {% for alert in alerts %}
-                    <div class="card alert-card animate__animated animate__fadeIn" style="animation-delay: {{ loop.index * 0.1 }}s;">
+                    <div class="card alert-card animate__animated animate__fadeIn" style="animation-delay: {{ (loop.index * 0.1)|format('%.1f') }}s;">
                         <div class="card-header d-flex align-items-center">
                             {% if alert.severity == 'critical' %}
                                 <i class="fas fa-exclamation-circle text-danger alert-icon"></i>
@@ -293,7 +293,7 @@
                             <div>
                                 <h5 class="card-title mb-0">{{ alert.title }}</h5>
                                 <span class="alert-time">{{ alert.timestamp }}</span>
-                                <span class="alert-badge severity-{{ alert.severity.lower() }} ms-2">{{ alert.severity }}</span>
+                                <span class="alert-badge severity-{{ alert.severity|lower }} ms-2">{{ alert.severity }}</span>
                                 <span class="badge bg-secondary ms-2">{{ alert.type }}</span>
                             </div>
                             

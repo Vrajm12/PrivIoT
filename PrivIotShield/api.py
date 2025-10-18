@@ -3,7 +3,7 @@ import uuid
 import time
 from functools import wraps
 from flask import Blueprint, request, jsonify, current_app
-from app import db
+from extensions import db
 from models import User, Device, Scan, Vulnerability, PrivacyIssue, Report
 from security_scanner import scan_device
 from report_generator import generate_report

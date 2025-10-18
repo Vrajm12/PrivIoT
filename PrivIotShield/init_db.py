@@ -1,8 +1,11 @@
 import os
-from app import app, db
+from extensions import db
 from models import User
 from werkzeug.security import generate_password_hash
 import secrets
+
+# Import app after extensions to avoid circular import
+from app import app
 
 # Create database tables
 with app.app_context():

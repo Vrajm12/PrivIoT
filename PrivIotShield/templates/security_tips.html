@@ -1,0 +1,330 @@
+{% extends "layout.html" %}
+
+{% block title %}Security Tips - PrivIoT{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-md-12">
+            <div class="page-header mb-4">
+                <h1><i class="fas fa-lightbulb me-2"></i>Security Tips & Best Practices</h1>
+                <p class="text-muted">Learn how to protect your IoT devices and improve security</p>
+            </div>
+
+            <!-- Personalized Tips -->
+            <div class="card mb-4">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0"><i class="fas fa-star me-2"></i>Personalized Recommendations</h5>
+                </div>
+                <div class="card-body" id="personalizedTips">
+                    <div class="text-center">
+                        <div class="spinner-border text-primary" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                        <p class="mt-2">Loading personalized tips...</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- General Security Best Practices -->
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="card mb-4">
+                        <div class="card-header">
+                            <h5 class="mb-0"><i class="fas fa-network-wired me-2"></i>Network Security</h5>
+                        </div>
+                        <div class="card-body">
+                            <ul class="list-group list-group-flush">
+                                <li class="list-group-item">
+                                    <strong>Enable Network Segmentation:</strong> Create a separate network (VLAN) for IoT devices to isolate them from your main network. This limits potential damage if a device is compromised.
+                                </li>
+                                <li class="list-group-item">
+                                    <strong>Use Strong Wi-Fi Encryption:</strong> Enable WPA3 encryption on your router. If WPA3 isn't available, use WPA2 at minimum. Never use WEP encryption.
+                                </li>
+                                <li class="list-group-item">
+                                    <strong>Disable UPnP:</strong> Universal Plug and Play can be exploited by attackers. Disable it on your router unless absolutely necessary.
+                                </li>
+                                <li class="list-group-item">
+                                    <strong>Enable Firewall:</strong> Use your router's built-in firewall and consider implementing additional firewall rules for IoT devices.
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-md-6">
+                    <div class="card mb-4">
+                        <div class="card-header">
+                            <h5 class="mb-0"><i class="fas fa-key me-2"></i>Access Control</h5>
+                        </div>
+                        <div class="card-body">
+                            <ul class="list-group list-group-flush">
+                                <li class="list-group-item">
+                                    <strong>Change Default Passwords:</strong> Immediately change default usernames and passwords on all IoT devices. Use unique, strong passwords for each device.
+                                </li>
+                                <li class="list-group-item">
+                                    <strong>Enable Two-Factor Authentication:</strong> If available, enable 2FA on device accounts and associated mobile apps.
+                                </li>
+                                <li class="list-group-item">
+                                    <strong>Limit Remote Access:</strong> Only enable remote access when necessary. Use VPN instead of exposing devices directly to the internet.
+                                </li>
+                                <li class="list-group-item">
+                                    <strong>Review Permissions:</strong> Regularly audit which apps and services have access to your devices and revoke unnecessary permissions.
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="card mb-4">
+                        <div class="card-header">
+                            <h5 class="mb-0"><i class="fas fa-sync-alt me-2"></i>Updates & Maintenance</h5>
+                        </div>
+                        <div class="card-body">
+                            <ul class="list-group list-group-flush">
+                                <li class="list-group-item">
+                                    <strong>Enable Automatic Updates:</strong> Turn on automatic firmware updates when available to ensure devices receive security patches promptly.
+                                </li>
+                                <li class="list-group-item">
+                                    <strong>Check for Updates Regularly:</strong> Many devices don't support automatic updates. Check manufacturer websites monthly for firmware updates.
+                                </li>
+                                <li class="list-group-item">
+                                    <strong>Retire Old Devices:</strong> Replace devices that no longer receive security updates. Unsupported devices are security risks.
+                                </li>
+                                <li class="list-group-item">
+                                    <strong>Regular Security Scans:</strong> Use PrivIoT to scan your devices weekly and address vulnerabilities promptly.
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-md-6">
+                    <div class="card mb-4">
+                        <div class="card-header">
+                            <h5 class="mb-0"><i class="fas fa-user-shield me-2"></i>Privacy Protection</h5>
+                        </div>
+                        <div class="card-body">
+                            <ul class="list-group list-group-flush">
+                                <li class="list-group-item">
+                                    <strong>Review Privacy Settings:</strong> Check what data your devices collect and configure privacy settings to minimize data collection.
+                                </li>
+                                <li class="list-group-item">
+                                    <strong>Disable Unnecessary Features:</strong> Turn off microphones, cameras, and other sensors when not in use.
+                                </li>
+                                <li class="list-group-item">
+                                    <strong>Read Privacy Policies:</strong> Understand what data manufacturers collect and how it's used before purchasing devices.
+                                </li>
+                                <li class="list-group-item">
+                                    <strong>Local Processing:</strong> Prefer devices that process data locally rather than sending it to cloud services.
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Device-Specific Tips -->
+            {% if device_types %}
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="fas fa-devices me-2"></i>Tips for Your Devices</h5>
+                </div>
+                <div class="card-body">
+                    <p class="text-muted">Based on your device types:</p>
+                    <div class="accordion" id="deviceTipsAccordion">
+                        {% if 'Smart Speaker' in device_types or 'Smart Home Device' in device_types %}
+                        <div class="accordion-item">
+                            <h2 class="accordion-header">
+                                <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#smartSpeakerTips">
+                                    Smart Speakers & Voice Assistants
+                                </button>
+                            </h2>
+                            <div id="smartSpeakerTips" class="accordion-collapse collapse show" data-bs-parent="#deviceTipsAccordion">
+                                <div class="accordion-body">
+                                    <ul>
+                                        <li>Use the mute button when having private conversations</li>
+                                        <li>Regularly review and delete voice recordings</li>
+                                        <li>Disable "always listening" mode if possible</li>
+                                        <li>Create separate user profiles for family members</li>
+                                        <li>Enable voice purchase PIN requirements</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                        {% endif %}
+
+                        {% if 'Security Camera' in device_types %}
+                        <div class="accordion-item">
+                            <h2 class="accordion-header">
+                                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#cameraTips">
+                                    Security Cameras
+                                </button>
+                            </h2>
+                            <div id="cameraTips" class="accordion-collapse collapse" data-bs-parent="#deviceTipsAccordion">
+                                <div class="accordion-body">
+                                    <ul>
+                                        <li>Change default admin credentials immediately</li>
+                                        <li>Enable encryption for video streams</li>
+                                        <li>Use local storage when possible instead of cloud-only</li>
+                                        <li>Position cameras to avoid capturing neighbor's property</li>
+                                        <li>Regularly check for unauthorized access to camera feeds</li>
+                                        <li>Use cameras with privacy shutters or LED indicators</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                        {% endif %}
+
+                        {% if 'Smart Thermostat' in device_types %}
+                        <div class="accordion-item">
+                            <h2 class="accordion-header">
+                                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#thermostatTips">
+                                    Smart Thermostats
+                                </button>
+                            </h2>
+                            <div id="thermostatTips" class="accordion-collapse collapse" data-bs-parent="#deviceTipsAccordion">
+                                <div class="accordion-body">
+                                    <ul>
+                                        <li>Disable location tracking if you don't use geofencing</li>
+                                        <li>Review energy usage data sharing settings</li>
+                                        <li>Use local control options when available</li>
+                                        <li>Set up guest access with limited permissions</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Quick Security Checklist -->
+            <div class="card">
+                <div class="card-header bg-success text-white">
+                    <h5 class="mb-0"><i class="fas fa-check-double me-2"></i>Quick Security Checklist</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-check mb-2">
+                                <input class="form-check-input" type="checkbox" id="check1">
+                                <label class="form-check-label" for="check1">
+                                    Changed all default passwords
+                                </label>
+                            </div>
+                            <div class="form-check mb-2">
+                                <input class="form-check-input" type="checkbox" id="check2">
+                                <label class="form-check-label" for="check2">
+                                    Enabled automatic updates
+                                </label>
+                            </div>
+                            <div class="form-check mb-2">
+                                <input class="form-check-input" type="checkbox" id="check3">
+                                <label class="form-check-label" for="check3">
+                                    Set up separate IoT network
+                                </label>
+                            </div>
+                            <div class="form-check mb-2">
+                                <input class="form-check-input" type="checkbox" id="check4">
+                                <label class="form-check-label" for="check4">
+                                    Disabled unnecessary features
+                                </label>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-check mb-2">
+                                <input class="form-check-input" type="checkbox" id="check5">
+                                <label class="form-check-label" for="check5">
+                                    Reviewed privacy settings
+                                </label>
+                            </div>
+                            <div class="form-check mb-2">
+                                <input class="form-check-input" type="checkbox" id="check6">
+                                <label class="form-check-label" for="check6">
+                                    Enabled firewall protection
+                                </label>
+                            </div>
+                            <div class="form-check mb-2">
+                                <input class="form-check-input" type="checkbox" id="check7">
+                                <label class="form-check-label" for="check7">
+                                    Regular security scans scheduled
+                                </label>
+                            </div>
+                            <div class="form-check mb-2">
+                                <input class="form-check-input" type="checkbox" id="check8">
+                                <label class="form-check-label" for="check8">
+                                    Documented device inventory
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Load personalized tips
+    loadPersonalizedTips();
+
+    // Save checklist state to localStorage
+    document.querySelectorAll('input[type="checkbox"]').forEach(checkbox => {
+        const savedState = localStorage.getItem(checkbox.id);
+        if (savedState === 'true') {
+            checkbox.checked = true;
+        }
+
+        checkbox.addEventListener('change', function() {
+            localStorage.setItem(this.id, this.checked);
+        });
+    });
+
+    function loadPersonalizedTips() {
+        fetch('/api/tips/personalized')
+            .then(response => response.json())
+            .then(data => {
+                displayPersonalizedTips(data.tips || []);
+            })
+            .catch(error => {
+                document.getElementById('personalizedTips').innerHTML = 
+                    '<p class="text-muted">Unable to load personalized tips at this time.</p>';
+            });
+    }
+
+    function displayPersonalizedTips(tips) {
+        const container = document.getElementById('personalizedTips');
+        
+        if (tips.length === 0) {
+            container.innerHTML = '<p class="text-muted">No personalized tips available. Add devices and run scans to get customized recommendations.</p>';
+            return;
+        }
+
+        let html = '<div class="row">';
+        tips.forEach((tip, index) => {
+            const priorityClass = tip.priority === 'critical' ? 'danger' : 
+                                 tip.priority === 'high' ? 'warning' : 'info';
+            
+            html += `
+                <div class="col-md-6 mb-3">
+                    <div class="alert alert-${priorityClass} mb-0">
+                        <h6 class="alert-heading"><i class="fas fa-exclamation-triangle me-2"></i>${tip.title}</h6>
+                        <p class="mb-1">${tip.description}</p>
+                        <small class="text-muted">Category: ${tip.category}</small>
+                    </div>
+                </div>
+            `;
+        });
+        html += '</div>';
+
+        container.innerHTML = html;
+    }
+});
+</script>
+{% endblock %}

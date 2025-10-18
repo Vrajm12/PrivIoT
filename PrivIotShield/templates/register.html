@@ -1,6 +1,6 @@
 {% extends "layout.html" %}
 
-{% block title %}Register - PrivIoT{% endblock %}
+{% block title %}PrivIoT - Register{% endblock %}
 
 {% block content %}
 <div class="auth-container">
@@ -16,7 +16,8 @@
             <h2 class="auth-title text-center">Create Account</h2>
             <p class="auth-subtitle text-center">Join our platform and protect your IoT devices</p>
             
-            <form method="post" action="{{ url_for('register') }}" class="auth-form">
+            <form method="POST" action="{{ url_for('register') }}">
+                
                 <div class="form-group">
                     <label for="username" class="form-label">Username</label>
                     <div class="input-group">

@@ -444,7 +444,6 @@ body {
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
-  text-fill-color: transparent;
 }
 
 .stat-card:nth-child(2) .stat-value {
@@ -464,27 +463,22 @@ body {
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
-  text-fill-color: transparent;
 }
 
 .stat-card .text-warning {
   background: linear-gradient(90deg, var(--warning-color), #FCD34D);
+  background: linear-gradient(90deg, var(--warning-color), #FCD34D);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
-  text-fill-color: transparent;
 }
-
 .stat-card .text-success {
+  background: linear-gradient(90deg, var(--success-color), #34D399);
+  -webkit-background-clip: text;
   background: linear-gradient(90deg, var(--success-color), #34D399);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
-  text-fill-color: transparent;
-}
-
-.stat-label {
-  font-size: 1rem;
   color: var(--text-muted);
   font-weight: 500;
 }
@@ -689,7 +683,6 @@ body {
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
-  text-fill-color: transparent;
   letter-spacing: -0.5px;
 }
 
@@ -794,7 +787,6 @@ body {
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
-  text-fill-color: transparent;
   letter-spacing: -0.5px;
 }
 

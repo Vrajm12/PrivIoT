@@ -168,21 +168,11 @@
         const exportButtons = document.querySelectorAll('.report-export-btn');
         exportButtons.forEach(button => {
             button.addEventListener('click', function() {
-                // Show loading state
-                const originalText = this.innerHTML;
-                this.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Exporting...';
-                this.disabled = true;
+                const reportId = this.getAttribute('data-report-id');
+                const exportType = this.getAttribute('data-export-type');
                 
-                // In a real app, this would be an API call to export the report
-                // For this demo, we'll simulate it with a timeout
-                setTimeout(() => {
-                    this.innerHTML = originalText;
-                    this.disabled = false;
-                    
-                    // Show success message
-                    const toast = new bootstrap.Toast(document.getElementById('exportSuccessToast'));
-                    toast.show();
-                }, 2000);
+                // Redirect to export endpoint
+                window.location.href = `/report/${reportId}/export/${exportType}`;
             });
         });
     });

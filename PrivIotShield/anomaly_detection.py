@@ -5,7 +5,7 @@ import random
 from datetime import datetime, timedelta
 import numpy as np
 from openai import OpenAI
-from app import app
+from flask import current_app
 
 # Configure logging
 logger = logging.getLogger(__name__)

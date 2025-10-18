@@ -1,0 +1,394 @@
+{% extends "layout.html" %}
+
+{% block title %}Trend Analysis - PrivIoT{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-md-12">
+            <div class="page-header mb-4">
+                <h1><i class="fas fa-chart-line me-2"></i>Security Trend Analysis</h1>
+                <p class="text-muted">Track security improvements and identify patterns over time</p>
+            </div>
+
+            <!-- Analysis Options -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="fas fa-filter me-2"></i>Analysis Options</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-4">
+                            <div class="form-group mb-3">
+                                <label for="analysisType" class="form-label">Analysis Type</label>
+                                <select class="form-select" id="analysisType">
+                                    <option value="global">All Devices (Global View)</option>
+                                    <option value="device">Specific Device</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-md-4" id="deviceSelectGroup" style="display: none;">
+                            <div class="form-group mb-3">
+                                <label for="deviceSelect" class="form-label">Select Device</label>
+                                <select class="form-select" id="deviceSelect">
+                                    <option value="">Choose a device...</option>
+                                    {% for device in devices %}
+                                    <option value="{{ device.id }}">{{ device.name }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="form-group mb-3">
+                                <label for="timePeriod" class="form-label">Time Period</label>
+                                <select class="form-select" id="timePeriod">
+                                    <option value="7">Last 7 Days</option>
+                                    <option value="30" selected>Last 30 Days</option>
+                                    <option value="90">Last 90 Days</option>
+                                    <option value="180">Last 6 Months</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    <button type="button" class="btn btn-primary" id="analyzeTrendsBtn">
+                        <i class="fas fa-chart-bar me-2"></i>Analyze Trends
+                    </button>
+                </div>
+            </div>
+
+            <!-- Loading Indicator -->
+            <div class="card mb-4" id="loadingCard" style="display: none;">
+                <div class="card-body text-center">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                    <p class="mt-2">Analyzing security trends...</p>
+                </div>
+            </div>
+
+            <!-- Trend Results -->
+            <div id="trendsResults" style="display: none;">
+                <!-- Summary Cards -->
+                <div class="row mb-4">
+                    <div class="col-md-3">
+                        <div class="card stat-card">
+                            <div class="card-body">
+                                <h6 class="text-muted">Avg Security Score</h6>
+                                <h2 id="avgSecurityScore">-</h2>
+                                <p class="trend-indicator" id="securityTrend"></p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card stat-card">
+                            <div class="card-body">
+                                <h6 class="text-muted">Total Scans</h6>
+                                <h2 id="totalScans">-</h2>
+                                <p class="text-muted">in selected period</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card stat-card">
+                            <div class="card-body">
+                                <h6 class="text-muted">Vulnerabilities Found</h6>
+                                <h2 id="totalVulns">-</h2>
+                                <p class="trend-indicator" id="vulnTrend"></p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card stat-card">
+                            <div class="card-body">
+                                <h6 class="text-muted">Risk Level</h6>
+                                <h2 id="currentRisk">-</h2>
+                                <p class="text-muted">current status</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Charts -->
+                <div class="row mb-4">
+                    <div class="col-md-6">
+                        <div class="card">
+                            <div class="card-header">
+                                <h5 class="mb-0">Security Score Trend</h5>
+                            </div>
+                            <div class="card-body">
+                                <canvas id="scoreChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="card">
+                            <div class="card-header">
+                                <h5 class="mb-0">Vulnerability Trends</h5>
+                            </div>
+                            <div class="card-body">
+                                <canvas id="vulnChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Recommendations -->
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="mb-0"><i class="fas fa-lightbulb me-2"></i>Recommendations</h5>
+                    </div>
+                    <div class="card-body">
+                        <div id="recommendationsList"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const analysisType = document.getElementById('analysisType');
+    const deviceSelectGroup = document.getElementById('deviceSelectGroup');
+    const deviceSelect = document.getElementById('deviceSelect');
+    const timePeriod = document.getElementById('timePeriod');
+    const analyzeTrendsBtn = document.getElementById('analyzeTrendsBtn');
+    const loadingCard = document.getElementById('loadingCard');
+    const trendsResults = document.getElementById('trendsResults');
+    
+    let scoreChart = null;
+    let vulnChart = null;
+
+    // Toggle device selection visibility
+    analysisType.addEventListener('change', function() {
+        if (this.value === 'device') {
+            deviceSelectGroup.style.display = 'block';
+        } else {
+            deviceSelectGroup.style.display = 'none';
+        }
+    });
+
+    analyzeTrendsBtn.addEventListener('click', function() {
+        const type = analysisType.value;
+        const days = parseInt(timePeriod.value);
+        
+        if (type === 'device' && !deviceSelect.value) {
+            alert('Please select a device');
+            return;
+        }
+
+        loadTrends(type, deviceSelect.value, days);
+    });
+
+    function loadTrends(type, deviceId, days) {
+        loadingCard.style.display = 'block';
+        trendsResults.style.display = 'none';
+
+        let url = type === 'global' 
+            ? `/api/trends/global?days=${days}`
+            : `/api/trends/device/${deviceId}?days=${days}`;
+
+        fetch(url)
+            .then(response => response.json())
+            .then(data => {
+                loadingCard.style.display = 'none';
+                
+                if (data.error) {
+                    alert('Error: ' + data.error);
+                    return;
+                }
+
+                displayTrends(data, type);
+            })
+            .catch(error => {
+                loadingCard.style.display = 'none';
+                alert('Error loading trends: ' + error.message);
+            });
+    }
+
+    function displayTrends(data, type) {
+        trendsResults.style.display = 'block';
+
+        // Update summary cards
+        if (type === 'global') {
+            document.getElementById('avgSecurityScore').textContent = 
+                data.average_scores?.overall?.toFixed(1) || 'N/A';
+            document.getElementById('totalScans').textContent = data.total_scans || 0;
+            document.getElementById('totalVulns').textContent = 
+                data.vulnerability_statistics?.total || 0;
+        } else {
+            document.getElementById('avgSecurityScore').textContent = 
+                data.score_trends?.averages?.overall?.toFixed(1) || 'N/A';
+            document.getElementById('totalScans').textContent = data.total_scans || 0;
+            document.getElementById('totalVulns').textContent = 
+                (data.vulnerability_trends?.total_by_scan?.reduce((a, b) => a + b, 0) || 0);
+            
+            // Display trend direction
+            const securityTrend = data.score_trends?.trend_direction?.overall;
+            displayTrendIndicator('securityTrend', securityTrend);
+        }
+
+        // Update charts
+        if (type === 'device') {
+            updateScoreChart(data.score_trends);
+            updateVulnChart(data.vulnerability_trends);
+        }
+
+        // Display recommendations
+        displayRecommendations(data.recommendations || []);
+    }
+
+    function updateScoreChart(scoreTrends) {
+        const ctx = document.getElementById('scoreChart').getContext('2d');
+        
+        if (scoreChart) {
+            scoreChart.destroy();
+        }
+
+        scoreChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: scoreTrends.dates,
+                datasets: [{
+                    label: 'Overall Score',
+                    data: scoreTrends.overall_scores,
+                    borderColor: 'rgb(59, 130, 246)',
+                    backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                    tension: 0.4
+                }, {
+                    label: 'Security Score',
+                    data: scoreTrends.security_scores,
+                    borderColor: 'rgb(34, 197, 94)',
+                    backgroundColor: 'rgba(34, 197, 94, 0.1)',
+                    tension: 0.4
+                }, {
+                    label: 'Privacy Score',
+                    data: scoreTrends.privacy_scores,
+                    borderColor: 'rgb(168, 85, 247)',
+                    backgroundColor: 'rgba(168, 85, 247, 0.1)',
+                    tension: 0.4
+                }]
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    legend: {
+                        position: 'top',
+                    },
+                    title: {
+                        display: false
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        max: 10
+                    }
+                }
+            }
+        });
+    }
+
+    function updateVulnChart(vulnTrends) {
+        const ctx = document.getElementById('vulnChart').getContext('2d');
+        
+        if (vulnChart) {
+            vulnChart.destroy();
+        }
+
+        vulnChart = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: vulnTrends.dates,
+                datasets: [{
+                    label: 'Critical',
+                    data: vulnTrends.by_severity.critical,
+                    backgroundColor: 'rgba(239, 68, 68, 0.8)'
+                }, {
+                    label: 'High',
+                    data: vulnTrends.by_severity.high,
+                    backgroundColor: 'rgba(249, 115, 22, 0.8)'
+                }, {
+                    label: 'Medium',
+                    data: vulnTrends.by_severity.medium,
+                    backgroundColor: 'rgba(234, 179, 8, 0.8)'
+                }, {
+                    label: 'Low',
+                    data: vulnTrends.by_severity.low,
+                    backgroundColor: 'rgba(34, 197, 94, 0.8)'
+                }]
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    legend: {
+                        position: 'top',
+                    }
+                },
+                scales: {
+                    x: {
+                        stacked: true,
+                    },
+                    y: {
+                        stacked: true,
+                        beginAtZero: true
+                    }
+                }
+            }
+        });
+    }
+
+    function displayTrendIndicator(elementId, trend) {
+        const element = document.getElementById(elementId);
+        if (!element) return;
+
+        let html = '';
+        if (trend === 'improving') {
+            html = '<i class="fas fa-arrow-up text-success"></i> Improving';
+            element.className = 'trend-indicator text-success';
+        } else if (trend === 'declining') {
+            html = '<i class="fas fa-arrow-down text-danger"></i> Declining';
+            element.className = 'trend-indicator text-danger';
+        } else if (trend === 'stable') {
+            html = '<i class="fas fa-minus text-info"></i> Stable';
+            element.className = 'trend-indicator text-info';
+        } else {
+            html = 'Insufficient data';
+            element.className = 'trend-indicator text-muted';
+        }
+        element.innerHTML = html;
+    }
+
+    function displayRecommendations(recommendations) {
+        const listDiv = document.getElementById('recommendationsList');
+        
+        if (!recommendations || recommendations.length === 0) {
+            listDiv.innerHTML = '<p class="text-muted">No specific recommendations at this time.</p>';
+            return;
+        }
+
+        let html = '<ul class="list-group list-group-flush">';
+        recommendations.forEach(rec => {
+            html += `<li class="list-group-item">
+                <i class="fas fa-check-circle text-success me-2"></i>${rec}
+            </li>`;
+        });
+        html += '</ul>';
+        
+        listDiv.innerHTML = html;
+    }
+});
+</script>
+
+<style>
+.stat-card {
+    border-left: 4px solid #3b82f6;
+}
+
+.trend-indicator {
+    font-size: 0.875rem;
+    margin-bottom: 0;
+}
+</style>
+{% endblock %}

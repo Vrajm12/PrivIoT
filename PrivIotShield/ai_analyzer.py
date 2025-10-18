@@ -2,7 +2,7 @@ import os
 import json
 import logging
 from openai import OpenAI
-from app import app
+from flask import current_app
 from datetime import datetime
 
 # Configure logging
@@ -133,7 +133,7 @@ def analyze_device_security(device_data):
         return result
     
     except Exception as e:
-        app.logger.error(f"Error in AI security analysis: {str(e)}")
+        current_app.logger.error(f"Error in AI security analysis: {str(e)}")
         return {
             "vulnerabilities": [],
             "security_score": 5.0,
@@ -241,7 +241,7 @@ def analyze_privacy_risks(device_data):
         return result
     
     except Exception as e:
-        app.logger.error(f"Error in AI privacy analysis: {str(e)}")
+        current_app.logger.error(f"Error in AI privacy analysis: {str(e)}")
         return {
             "privacy_issues": [],
             "privacy_score": 5.0,
@@ -323,7 +323,7 @@ def generate_security_recommendations(vulnerabilities):
         return result
     
     except Exception as e:
-        app.logger.error(f"Error generating security recommendations: {str(e)}")
+        current_app.logger.error(f"Error generating security recommendations: {str(e)}")
         return {"recommendations": []}
 
 

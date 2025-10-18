@@ -1,5 +1,5 @@
 import json
-from app import app
+from flask import current_app
 
 
 def analyze_privacy_features(device_data):

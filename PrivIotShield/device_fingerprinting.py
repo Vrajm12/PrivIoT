@@ -4,7 +4,7 @@ import logging
 import hashlib
 from datetime import datetime
 from openai import OpenAI
-from app import app
+from flask import current_app
 
 # Configure logging
 logger = logging.getLogger(__name__)

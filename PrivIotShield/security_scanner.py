@@ -3,7 +3,7 @@ import random
 import logging
 import time
 from datetime import datetime
-from app import app
+from flask import current_app
 from ai_analyzer import analyze_device_security, analyze_privacy_risks
 from cvss_calculator import calculate_cvss_score
 from openai_integration import analyze_device_security_with_ai, analyze_privacy_risks_with_ai
@@ -24,7 +24,7 @@ def scan_device(device):
     Returns:
         dict: Scan results including vulnerabilities and privacy issues
     """
-    app.logger.info(f"Starting security scan for device: {device.name} (ID: {device.id})")
+    current_app.logger.info(f"Starting security scan for device: {device.name} (ID: {device.id})")
     
     scan_start_time = time.time()
     
@@ -140,11 +140,11 @@ def scan_device(device):
             }
         }
         
-        app.logger.info(f"Scan completed for device {device.name} with score {overall_score}")
+        current_app.logger.info(f"Scan completed for device {device.name} with score {overall_score}")
         return scan_result
     
     except Exception as e:
-        app.logger.error(f"Error during device scan: {str(e)}")
+        current_app.logger.error(f"Error during device scan: {str(e)}")
         raise Exception(f"Device scan failed: {str(e)}")
 
 

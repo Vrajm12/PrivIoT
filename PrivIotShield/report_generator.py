@@ -2,7 +2,7 @@ import os
 import json
 import logging
 from openai import OpenAI
-from app import app
+from flask import current_app
 from markupsafe import Markup
 from openai_integration import generate_report_with_ai
 
@@ -96,7 +96,7 @@ def generate_report(scan, report_type):
                 return generate_summary_report(report_data)  # Default to summary
             
     except Exception as e:
-        app.logger.error(f"Error generating report: {str(e)}")
+        current_app.logger.error(f"Error generating report: {str(e)}")
         return f"<p>Error generating report: {str(e)}</p>"
 
 
@@ -151,7 +151,7 @@ def generate_detailed_report(report_data):
         return Markup(html_content)
     
     except Exception as e:
-        app.logger.error(f"Error generating detailed report: {str(e)}")
+        current_app.logger.error(f"Error generating detailed report: {str(e)}")
         return f"<p>Error generating detailed report: {str(e)}</p>"
 
 
@@ -205,7 +205,7 @@ def generate_summary_report(report_data):
         return Markup(html_content)
     
     except Exception as e:
-        app.logger.error(f"Error generating summary report: {str(e)}")
+        current_app.logger.error(f"Error generating summary report: {str(e)}")
         return f"<p>Error generating summary report: {str(e)}</p>"
 
 
@@ -260,5 +260,5 @@ def generate_executive_report(report_data):
         return Markup(html_content)
     
     except Exception as e:
-        app.logger.error(f"Error generating executive report: {str(e)}")
+        current_app.logger.error(f"Error generating executive report: {str(e)}")
         return f"<p>Error generating executive report: {str(e)}</p>"

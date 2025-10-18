@@ -2,14 +2,76 @@ import os
 import json
 import uuid
 from datetime import datetime, timedelta
-from flask import render_template, redirect, url_for, flash, request, jsonify, abort, session, current_app
+from flask import render_template, redirect, url_for, flash, request, jsonify, abort, session, current_app, make_response
 from flask_login import login_user, logout_user, login_required, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
-from app import app, db, csrf
+from extensions import db
 from models import User, Device, Scan, Vulnerability, PrivacyIssue, Report, UserActivity, DeviceGroup
 from security_scanner import scan_device
 from report_generator import generate_report
 from sqlalchemy import func, desc
+
+# Delayed route registration - collect route definitions and register them later
+_pending_routes = []
+_app = None
+_csrf = None
+
+class _RouteDecorator:
+    """Decorator that delays route registration until init_routes() is called"""
+    def __init__(self, *args, **kwargs):
+        self.args = args
+        self.kwargs = kwargs
+    
+    def __call__(self, func):
+        _pending_routes.append((self.args, self.kwargs, func))
+        return func
+
+class _AppProxy:
+    """Proxy for app that collects routes for later registration"""
+    def route(self, *args, **kwargs):
+        return _RouteDecorator(*args, **kwargs)
+    
+    def context_processor(self, func):
+        """Store context processor for later registration"""
+        func._is_context_processor = True
+        _pending_routes.append(((), {}, func))
+        return func
+    
+    @property
+    def logger(self):
+        from flask import current_app
+        return current_app.logger
+
+class _CSRFProxy:
+    """Proxy for csrf that delays exemption until init"""
+    def exempt(self, func):
+        func._csrf_exempt = True
+        return func
+
+app = _AppProxy()
+csrf = _CSRFProxy()
+
+def init_routes(flask_app, csrf_protect):
+    """Initialize routes - registers all collected routes with the Flask app"""
+    global _app, _csrf
+    _app = flask_app
+    _csrf = csrf_protect
+    
+    # Register all collected routes
+    for args, kwargs, func in _pending_routes:
+        # Check if it's a context processor
+        if hasattr(func, '_is_context_processor'):
+            flask_app.context_processor(func)
+        else:
+            # Regular route
+            route_decorator = flask_app.route(*args, **kwargs)
+            route_decorator(func)
+        
+        # Apply CSRF exemption if marked
+        if hasattr(func, '_csrf_exempt') and func._csrf_exempt:
+            csrf_protect.exempt(func)
+    
+    return flask_app
 
 
 def log_user_activity(activity_type, activity_data=None):
@@ -26,7 +88,7 @@ def log_user_activity(activity_type, activity_data=None):
             db.session.add(activity)
             db.session.commit()
         except Exception as e:
-            app.logger.error(f"Failed to log user activity: {str(e)}")
+            current_app.logger.error(f"Failed to log user activity: {str(e)}")
             db.session.rollback()
 
 
@@ -1042,3 +1104,284 @@ def batch_remediate_vulnerabilities():
     except Exception as e:
         app.logger.error(f"Error in batch vulnerability remediation: {str(e)}")
         return jsonify({'error': str(e), 'success': False}), 500
+
+
+# ============================================================================
+# NEW ENHANCED ROUTES FOR PRODUCTION FEATURES
+# ============================================================================
+
+@app.route('/network-scan')
+@login_required
+def network_scan_page():
+    """Network scanning interface"""
+    log_user_activity('network_scan_view')
+    return render_template('network_scan.html')
+
+
+@app.route('/api/network-scan/start', methods=['POST'])
+@login_required
+def start_network_scan():
+    """Start automatic network scanning"""
+    try:
+        from network_scanner import network_scanner
+        
+        data = request.get_json() or {}
+        network_range = data.get('network_range', None)
+        
+        # Start network scan
+        discovered_devices = network_scanner.scan_network(network_range)
+        
+        log_user_activity('network_scan_complete', {
+            'devices_found': len(discovered_devices),
+            'network_range': network_range
+        })
+        
+        return jsonify({
+            'success': True,
+            'devices_found': len(discovered_devices),
+            'devices': discovered_devices
+        }), 200
+        
+    except Exception as e:
+        app.logger.error(f"Error in network scan: {str(e)}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/device/import', methods=['POST'])
+@login_required
+def import_discovered_device():
+    """Import a discovered device into the system"""
+    try:
+        data = request.get_json()
+        
+        # Create new device from discovered data
+        new_device = Device(
+            name=data.get('hostname', 'Unknown Device'),
+            device_type=data.get('device_type', 'Unknown'),
+            manufacturer=data.get('manufacturer', 'Unknown'),
+            ip_address=data.get('ip_address'),
+            mac_address=data.get('mac_address'),
+            firmware_version=data.get('firmware_info', {}).get('detected_version', 'Unknown'),
+            user_id=current_user.id
+        )
+        
+        db.session.add(new_device)
+        db.session.commit()
+        
+        log_user_activity('device_imported', {'device_id': new_device.id})
+        
+        return jsonify({
+            'success': True,
+            'device_id': new_device.id,
+            'message': 'Device imported successfully'
+        }), 200
+        
+    except Exception as e:
+        db.session.rollback()
+        app.logger.error(f"Error importing device: {str(e)}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/trends')
+@login_required
+def trends_page():
+    """Trend analysis dashboard"""
+    log_user_activity('trends_view')
+    
+    # Get user's devices for the dropdown
+    devices = Device.query.filter_by(user_id=current_user.id).all()
+    
+    return render_template('trends.html', devices=devices)
+
+
+@app.route('/api/trends/device/<int:device_id>')
+@login_required
+def device_trends(device_id):
+    """Get trend analysis for a specific device"""
+    try:
+        # Verify device ownership
+        device = Device.query.get_or_404(device_id)
+        if device.user_id != current_user.id and current_user.role != 'admin':
+            return jsonify({'error': 'Unauthorized'}), 403
+        
+        from trend_analysis import trend_analyzer
+        
+        days = request.args.get('days', 30, type=int)
+        trends = trend_analyzer.analyze_device_trends(device_id, days)
+        
+        return jsonify(trends), 200
+        
+    except Exception as e:
+        app.logger.error(f"Error getting device trends: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/trends/global')
+@login_required
+def global_trends():
+    """Get global trend analysis for all user devices"""
+    try:
+        from trend_analysis import trend_analyzer
+        
+        days = request.args.get('days', 30, type=int)
+        trends = trend_analyzer.analyze_global_trends(current_user.id, days)
+        
+        return jsonify(trends), 200
+        
+    except Exception as e:
+        app.logger.error(f"Error getting global trends: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/report/<int:report_id>/export/<format>')
+@login_required
+def export_report(report_id, format):
+    """Export report in various formats (pdf, csv, json)"""
+    try:
+        from export_service import report_exporter
+        
+        # Get the report
+        report = Report.query.get_or_404(report_id)
+        
+        # Verify ownership
+        if report.user_id != current_user.id and current_user.role != 'admin':
+            flash('You do not have permission to export this report.', 'danger')
+            return redirect(url_for('reports'))
+        
+        # Get the scan
+        scan = Scan.query.get(report.scan_id)
+        if not scan:
+            flash('Associated scan not found.', 'danger')
+            return redirect(url_for('reports'))
+        
+        # Prepare report data
+        report_data = {
+            'scan_id': scan.id,
+            'device': scan.device,
+            'vulnerabilities': scan.vulnerabilities.all(),
+            'privacy_issues': scan.privacy_issues.all()
+        }
+        
+        # Generate export based on format
+        if format == 'pdf':
+            buffer = report_exporter.export_to_pdf(scan, report_data, report.report_type)
+            
+            response = make_response(buffer.getvalue())
+            response.headers['Content-Type'] = 'application/pdf'
+            response.headers['Content-Disposition'] = f'attachment; filename=security_report_{report_id}.pdf'
+            
+            log_user_activity('report_export', {'report_id': report_id, 'format': 'pdf'})
+            return response
+            
+        elif format == 'csv':
+            csv_data = report_exporter.export_to_csv(scan, report_data)
+            
+            response = make_response(csv_data)
+            response.headers['Content-Type'] = 'text/csv'
+            response.headers['Content-Disposition'] = f'attachment; filename=security_report_{report_id}.csv'
+            
+            log_user_activity('report_export', {'report_id': report_id, 'format': 'csv'})
+            return response
+            
+        elif format == 'json':
+            json_data = report_exporter.export_to_json(scan, report_data)
+            
+            response = make_response(json_data)
+            response.headers['Content-Type'] = 'application/json'
+            response.headers['Content-Disposition'] = f'attachment; filename=security_report_{report_id}.json'
+            
+            log_user_activity('report_export', {'report_id': report_id, 'format': 'json'})
+            return response
+            
+        else:
+            flash('Invalid export format. Supported formats: pdf, csv, json', 'danger')
+            return redirect(url_for('report_detail', report_id=report_id))
+        
+    except Exception as e:
+        app.logger.error(f"Error exporting report: {str(e)}")
+        flash(f'Error exporting report: {str(e)}', 'danger')
+        return redirect(url_for('reports'))
+
+
+@app.route('/tips')
+@login_required
+def security_tips():
+    """Security tips and best practices page"""
+    log_user_activity('tips_view')
+    
+    # Get user's devices to provide contextual tips
+    devices = Device.query.filter_by(user_id=current_user.id).all()
+    device_types = list(set([d.device_type for d in devices if d.device_type]))
+    
+    return render_template('security_tips.html', device_types=device_types)
+
+
+@app.route('/api/tips/personalized')
+@login_required
+def get_personalized_tips():
+    """Get personalized security tips based on user's devices and scans"""
+    try:
+        tips = []
+        
+        # Get user's devices and recent scans
+        devices = Device.query.filter_by(user_id=current_user.id).all()
+        
+        if not devices:
+            tips.append({
+                'category': 'Getting Started',
+                'title': 'Add Your First Device',
+                'description': 'Start by adding your IoT devices to begin security monitoring.',
+                'priority': 'high'
+            })
+            return jsonify({'tips': tips}), 200
+        
+        # Analyze recent scans for personalized recommendations
+        for device in devices:
+            latest_scan = device.get_latest_scan()
+            
+            if not latest_scan:
+                tips.append({
+                    'category': 'Device Monitoring',
+                    'title': f'Scan {device.name}',
+                    'description': f'This device has not been scanned yet. Run a security scan to identify potential vulnerabilities.',
+                    'priority': 'high',
+                    'device_id': device.id
+                })
+            elif latest_scan.security_score < 5.0:
+                tips.append({
+                    'category': 'Critical Action Required',
+                    'title': f'Address Critical Issues on {device.name}',
+                    'description': f'This device has a low security score ({latest_scan.security_score:.1f}/10). Immediate action recommended.',
+                    'priority': 'critical',
+                    'device_id': device.id
+                })
+        
+        # Add general security tips
+        general_tips = [
+            {
+                'category': 'Network Security',
+                'title': 'Enable Network Segmentation',
+                'description': 'Isolate IoT devices on a separate network (VLAN) to limit potential attack surface.',
+                'priority': 'medium'
+            },
+            {
+                'category': 'Updates',
+                'title': 'Enable Automatic Updates',
+                'description': 'Ensure all devices have automatic security updates enabled when available.',
+                'priority': 'medium'
+            },
+            {
+                'category': 'Access Control',
+                'title': 'Use Strong Passwords',
+                'description': 'Change default passwords and use unique, strong passwords for each device.',
+                'priority': 'high'
+            }
+        ]
+        
+        tips.extend(general_tips)
+        
+        return jsonify({'tips': tips[:10]}), 200  # Return top 10 tips
+        
+    except Exception as e:
+        app.logger.error(f"Error getting personalized tips: {str(e)}")
+        return jsonify({'error': str(e)}), 500

@@ -3,7 +3,7 @@ import logging
 import json
 from datetime import datetime
 from twilio.rest import Client
-from app import app
+from flask import current_app
 from models import User
 
 # Configure logging
