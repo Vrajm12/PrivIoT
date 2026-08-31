@@ -1,0 +1,105 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: priviot_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: priviot_enterprise
+      POSTGRES_USER: priviot_admin
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-PrivIoT_Secure_DB_2026!}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U priviot_admin -d priviot_enterprise"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  web:
+    build: .
+    container_name: priviot_web
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      FLASK_ENV: production
+      DATABASE_URL: postgresql://priviot_admin:${POSTGRES_PASSWORD:-PrivIoT_Secure_DB_2026!}@postgres:5432/priviot_enterprise
+      SESSION_SECRET: ${SESSION_SECRET:-PrivIoT_Master_Session_Key_2026_Secure}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-ChangeMeInProduction2026!}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      REDIS_URL: redis://redis:6379/0
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/1
+    ports:
+      - "5000:5000"
+      - "8000:8000"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health/live"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  redis:
+    image: redis:7-alpine
+    container_name: priviot_redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  celery_worker:
+    build: .
+    container_name: priviot_celery_worker
+    restart: unless-stopped
+    command: celery -A priviot.workers.celery_app.celery_app worker --loglevel=info -c 4
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://priviot_admin:${POSTGRES_PASSWORD:-PrivIoT_Secure_DB_2026!}@postgres:5432/priviot_enterprise
+      REDIS_URL: redis://redis:6379/0
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/1
+
+  celery_beat:
+    build: .
+    container_name: priviot_celery_beat
+    restart: unless-stopped
+    command: celery -A priviot.workers.celery_app.celery_app beat --loglevel=info
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://priviot_admin:${POSTGRES_PASSWORD:-PrivIoT_Secure_DB_2026!}@postgres:5432/priviot_enterprise
+      REDIS_URL: redis://redis:6379/0
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/1
+
+  sensor:
+    build: ./sensor
+    container_name: priviot_edge_sensor
+    restart: unless-stopped
+    network_mode: host
+    depends_on:
+      - web
+    environment:
+      PRIVIOT_API_URL: http://127.0.0.1:8000/api/v2/telemetry/ingest
+      PRIVIOT_SENSOR_TOKEN: ${PRIVIOT_SENSOR_TOKEN:-}
+      BATCH_SIZE: 50
+      FLUSH_INTERVAL: 5.0
+
+volumes:
+  postgres_data:

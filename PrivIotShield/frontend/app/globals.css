@@ -1,0 +1,35 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-background text-text-primary font-sans antialiased selection:bg-accent/20 selection:text-accent;
+    overflow-x: hidden;
+  }
+
+  /* Custom Dark SOC Scrollbar */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    background: #0B0D0F;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: #292F36;
+    border-radius: 3px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: #5EE6C1;
+  }
+}
+
+@layer utilities {
+  .glow-accent {
+    box-shadow: 0 0 15px rgba(94, 230, 193, 0.15);
+  }
+  .glow-critical {
+    box-shadow: 0 0 15px rgba(255, 77, 95, 0.2);
+  }
+}

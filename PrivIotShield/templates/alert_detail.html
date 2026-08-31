@@ -1,0 +1,57 @@
+﻿{% extends "layout.html" %}
+
+{% block title %}Alert Detail - {{ alert.title }}{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="mb-4">
+        <a href="{{ url_for('alerts_view') }}" class="btn btn-outline-secondary btn-sm mb-3">
+            <i class="fas fa-arrow-left me-1"></i> Back to Alerts
+        </a>
+        <div class="d-flex justify-content-between align-items-center">
+            <div>
+                <h2 class="fw-bold text-light mb-1">
+                    <span class="badge bg-{% if alert.severity == 'critical' %}danger{% elif alert.severity == 'high' %}warning text-dark{% else %}info{% endif %} me-2">{{ alert.severity|upper }}</span>
+                    {{ alert.title }}
+                </h2>
+                <p class="text-muted mb-0">Alert UUID: <code>{{ alert.alert_uuid }}</code> | Detected: {{ alert.created_at.strftime('%Y-%m-%d %H:%M:%S UTC') }}</p>
+            </div>
+            <div>
+                <span class="badge bg-secondary fs-6 p-2">Status: {{ alert.status }}</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Explicit "Why did this alert fire?" Card -->
+    <div class="card bg-dark text-light border-0 shadow-sm mb-4">
+        <div class="card-header border-secondary bg-black bg-opacity-25 py-3">
+            <h5 class="mb-0 fw-bold text-info"><i class="fas fa-question-circle me-2"></i>Why did this alert fire?</h5>
+        </div>
+        <div class="card-body p-4">
+            <div class="row g-4">
+                <div class="col-md-6">
+                    <h6 class="text-uppercase text-muted fw-semibold">Target Asset</h6>
+                    {% if alert.asset %}
+                    <h4>{{ alert.asset.vendor }} {{ alert.asset.device_type }}</h4>
+                    <p class="mb-2">IP: <code class="text-info">{{ alert.asset.ip_address }}</code> | MAC: <code>{{ alert.asset.mac_address }}</code></p>
+                    <a href="{{ url_for('device_trust_profile', asset_id=alert.asset.id) }}" class="btn btn-sm btn-primary mt-1">
+                        <i class="fas fa-microchip me-1"></i> Open Device Trust Profile
+                    </a>
+                    {% else %}
+                    <p class="text-muted">Unattributed Network Event (Source IP outside recognized assets)</p>
+                    {% endif %}
+                </div>
+                <div class="col-md-6">
+                    <h6 class="text-uppercase text-muted fw-semibold">Observed Anomaly Description</h6>
+                    <p class="lead text-light">{{ alert.description }}</p>
+                </div>
+            </div>
+
+            <hr class="border-secondary my-4">
+
+            <h6 class="text-uppercase text-muted fw-semibold mb-3">Structured Technical Evidence</h6>
+            <pre class="bg-black text-warning p-3 rounded mb-0"><code>{{ alert.evidence_json }}</code></pre>
+        </div>
+    </div>
+</div>
+{% endblock %}

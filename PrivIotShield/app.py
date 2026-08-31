@@ -1,5 +1,6 @@
 import os
 import logging
+from datetime import datetime
 from flask import Flask, render_template
 from flask_migrate import Migrate
 from flask_wtf.csrf import CSRFProtect
@@ -25,9 +26,6 @@ app.secret_key = os.environ.get("SESSION_SECRET", "dev-priviot-secret-key-2025")
 
 # Initialize CSRF protection
 csrf = CSRFProtect(app)
-
-# Temporarily disable CSRF for testing (REMOVE IN PRODUCTION)
-app.config['WTF_CSRF_ENABLED'] = False
 
 # Initialize database migration
 migrate.init_app(app, db)
@@ -82,6 +80,46 @@ def internal_error(error):
 def forbidden_error(error):
     return render_template('errors/403.html'), 403
 
+# Production Health, Readiness & Observability Endpoints
+@app.route('/health')
+def health_check():
+    return {"status": "healthy", "version": "3.0.0", "timestamp": datetime.utcnow().isoformat()}, 200
+
+@app.route('/ready')
+def readiness_check():
+    try:
+        from sqlalchemy import text
+        db.session.execute(text('SELECT 1'))
+        return {"status": "ready", "database": "connected"}, 200
+    except Exception as e:
+        logger.error(f"Readiness probe failed: {e}")
+        return {"status": "unready", "database": "disconnected", "error": str(e)}, 503
+
+@app.route('/metrics')
+def prometheus_metrics():
+    try:
+        from models import Asset, Collector, Alert, Observation
+        assets_count = Asset.query.count()
+        collectors_count = Collector.query.count()
+        open_alerts_count = Alert.query.filter_by(status='OPEN').count()
+        total_observations = Observation.query.count()
+        return (
+            f"# HELP priviot_assets_total Total discovered assets\n"
+            f"# TYPE priviot_assets_total gauge\n"
+            f"priviot_assets_total {assets_count}\n"
+            f"# HELP priviot_collectors_total Total registered collectors\n"
+            f"# TYPE priviot_collectors_total gauge\n"
+            f"priviot_collectors_total {collectors_count}\n"
+            f"# HELP priviot_open_alerts_total Total open alerts\n"
+            f"# TYPE priviot_open_alerts_total gauge\n"
+            f"priviot_open_alerts_total {open_alerts_count}\n"
+            f"# HELP priviot_observations_total Total recorded observation events\n"
+            f"# TYPE priviot_observations_total counter\n"
+            f"priviot_observations_total {total_observations}\n"
+        ), 200, {'Content-Type': 'text/plain; charset=utf-8'}
+    except Exception as e:
+        return f"# Error collecting metrics: {str(e)}\n", 500, {'Content-Type': 'text/plain'}
+
 # Import and initialize routes after app is created
 try:
     import routes
@@ -93,8 +131,9 @@ except ImportError as e:
 # Register API blueprint
 try:
     from api import api_bp
+    csrf.exempt(api_bp)
     app.register_blueprint(api_bp, url_prefix='/api')
-    logger.info("API blueprint registered successfully")
+    logger.info("API blueprint registered and CSRF exempted successfully")
 except ImportError as e:
     logger.warning(f"api module not found: {str(e)}, skipping API blueprint registration")
 
@@ -126,6 +165,31 @@ with app.app_context():
             logger.info("Admin user created successfully")
     except Exception as e:
         logger.error(f"Failed to create admin user: {str(e)}")
+        db.session.rollback()
+
+    # Seed initial pilot inventory if empty
+    try:
+        from models import Asset, Device
+        if Asset.query.count() == 0:
+            admin_user = User.query.filter_by(username='admin').first()
+            admin_id = admin_user.id if admin_user else 1
+            pilot_assets = [
+                Asset(tenant_id="default_tenant", user_id=admin_id, ip_address="192.168.1.101", mac_address="00:12:17:88:41:A2", vendor="Hikvision", model="DS-2CD2042WD-I", device_type="IP Camera", identity_confidence=0.92, network_scope="HQ Alpha (192.168.1.0/24)"),
+                Asset(tenant_id="default_tenant", user_id=admin_id, ip_address="192.168.1.102", mac_address="50:C7:BF:12:34:56", vendor="TP-Link", model="Kasa HS100", device_type="Smart Plug", identity_confidence=0.88, network_scope="HQ Alpha (192.168.1.0/24)"),
+                Asset(tenant_id="default_tenant", user_id=admin_id, ip_address="192.168.1.103", mac_address="CC:6E:A4:91:02:11", vendor="Samsung", model="QN65Q80B", device_type="Smart TV", identity_confidence=0.85, network_scope="HQ Alpha (192.168.1.0/24)"),
+                Asset(tenant_id="default_tenant", user_id=admin_id, ip_address="192.168.1.104", mac_address="00:1E:0B:44:99:AA", vendor="HP", model="LaserJet Enterprise M608", device_type="Printer", identity_confidence=0.90, network_scope="HQ Alpha (192.168.1.0/24)"),
+                Asset(tenant_id="default_tenant", user_id=admin_id, ip_address="192.168.1.107", mac_address="94:E6:86:99:88:77", vendor="Generic Espressif", model="ESP32 Board", device_type="Generic IoT", identity_confidence=0.42, network_scope="HQ Alpha (192.168.1.0/24)")
+            ]
+            db.session.add_all(pilot_assets)
+            
+            for pa in pilot_assets:
+                d = Device(name=f"{pa.vendor} {pa.model}", device_type=pa.device_type, manufacturer=pa.vendor, model=pa.model, ip_address=pa.ip_address, mac_address=pa.mac_address, user_id=admin_id)
+                db.session.add(d)
+            
+            db.session.commit()
+            logger.info("Pilot lab inventory seeded successfully")
+    except Exception as e:
+        logger.warning(f"Pilot asset seeding note: {e}")
         db.session.rollback()
 
 logger.info("PrivIoT application initialized successfully")

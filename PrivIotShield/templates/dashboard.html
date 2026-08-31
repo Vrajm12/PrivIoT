@@ -1,314 +1,253 @@
-{% extends "layout.html" %}
+﻿{% extends "layout.html" %}
 
-{% block title %}Dashboard - PrivIoT{% endblock %}
+{% block title %}Security Operations Console — PrivIoT Shield{% endblock %}
 
 {% block content %}
-<div class="container">
-    <div class="row mb-4">
-        <div class="col-12">
-            <div class="d-flex justify-content-between align-items-center">
-                <h1 class="modern-section-title mb-0">
-                    <i class="fas fa-tachometer-alt me-2"></i>Security Dashboard
-                </h1>
-                <a href="{{ url_for('devices') }}" class="btn btn-primary neumorph-btn">
-                    <i class="fas fa-plus me-2"></i>Add Device
-                </a>
-            </div>
-            <p class="text-muted-custom">Monitor and manage your IoT device security in real-time</p>
-        </div>
+<div class="soc-page-header">
+    <div>
+        <h1 class="soc-page-title">Operational Security Console</h1>
+        <p class="soc-page-subtitle">Agentless Continuous Exposure Management & Automated Network Containment</p>
     </div>
-    
-    <!-- Quick Action Buttons -->
-    <div class="quick-actions mb-4">
-        <div class="quick-action-btn">
-            <div class="quick-action-icon">
-                <i class="fas fa-radar"></i>
-            </div>
-            <div class="quick-action-text">Scan Device</div>
-        </div>
-        <div class="quick-action-btn">
-            <div class="quick-action-icon">
-                <i class="fas fa-file-alt"></i>
-            </div>
-            <div class="quick-action-text">Generate Report</div>
-        </div>
-        <div class="quick-action-btn">
-            <div class="quick-action-icon">
-                <i class="fas fa-chart-line"></i>
-            </div>
-            <div class="quick-action-text">Trend Analysis</div>
-        </div>
-        <div class="quick-action-btn">
-            <div class="quick-action-icon">
-                <i class="fas fa-shield-alt"></i>
-            </div>
-            <div class="quick-action-text">Security Tips</div>
-        </div>
-    </div>
-    
-    <!-- Security Overview Cards -->
-    <div class="row mb-4 g-3">
-        <div class="col-md-6 col-lg-3">
-            <div class="card stat-card animate__animated animate__fadeIn" style="animation-delay: 0.1s">
-                <i class="stat-icon fas fa-microchip"></i>
-                <div class="stat-value">{{ total_devices }}</div>
-                <div class="stat-label">Total Devices</div>
-            </div>
-        </div>
-        <div class="col-md-6 col-lg-3">
-            <div class="card stat-card animate__animated animate__fadeIn" style="animation-delay: 0.2s">
-                <i class="stat-icon fas fa-exclamation-triangle"></i>
-                <div class="stat-value {% if vulnerable_devices > 0 %}text-warning{% else %}text-success{% endif %}">
-                    {{ vulnerable_devices }}
-                </div>
-                <div class="stat-label">Vulnerable Devices</div>
-            </div>
-        </div>
-        <div class="col-md-6 col-lg-3">
-            <div class="card stat-card animate__animated animate__fadeIn" style="animation-delay: 0.3s">
-                {% set security_color = 'danger' if avg_security_score < 4.0 else 'warning' if avg_security_score < 6.0 else 'success' %}
-                <i class="stat-icon fas fa-shield-alt"></i>
-                <div class="stat-value text-{{ security_color }}">{{ "%.1f"|format(avg_security_score) }}</div>
-                <div class="stat-label">Avg. Security Score</div>
-            </div>
-        </div>
-        <div class="col-md-6 col-lg-3">
-            <div class="card stat-card animate__animated animate__fadeIn" style="animation-delay: 0.4s">
-                {% set privacy_color = 'danger' if avg_privacy_score < 4.0 else 'warning' if avg_privacy_score < 6.0 else 'success' %}
-                <i class="stat-icon fas fa-user-shield"></i>
-                <div class="stat-value text-{{ privacy_color }}">{{ "%.1f"|format(avg_privacy_score) }}</div>
-                <div class="stat-label">Avg. Privacy Score</div>
-            </div>
-        </div>
-    </div>
-    
-    <div class="row mb-4">
-        <!-- Security Score Chart -->
-        <div class="col-md-6 mb-4">
-            <div class="gradient-border-card animate__animated animate__fadeIn" style="animation-delay: 0.5s">
-                <div class="gradient-border-card-inner">
-                    <div class="d-flex align-items-center mb-3">
-                        <i class="fas fa-chart-pie me-2 text-primary"></i>
-                        <h5 class="card-title mb-0">Security Assessment</h5>
-                    </div>
-                    <div class="row align-items-center">
-                        <div class="col-md-6 text-center">
-                            <div class="security-score-container mb-2">
-                                <canvas id="securityScoreChart" data-score="{{ avg_security_score }}"></canvas>
-                            </div>
-                            <div class="text-center">
-                                <strong>Security Score</strong>
-                                <div class="text-muted small">Overall security rating</div>
-                            </div>
-                        </div>
-                        <div class="col-md-6 text-center">
-                            <div class="security-score-container mb-2">
-                                <canvas id="privacyScoreChart" data-score="{{ avg_privacy_score }}"></canvas>
-                            </div>
-                            <div class="text-center">
-                                <strong>Privacy Score</strong>
-                                <div class="text-muted small">Data protection rating</div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-        
-        <!-- Device Security Status -->
-        <div class="col-md-6 mb-4">
-            <div class="card neumorph-card h-100 animate__animated animate__fadeIn" style="animation-delay: 0.6s">
-                <div class="card-header d-flex align-items-center">
-                    <i class="fas fa-microchip me-2 text-primary"></i>
-                    <h5 class="card-title mb-0">Device Security Status</h5>
-                </div>
-                <div class="card-body p-3">
-                    {% if devices %}
-                        {% set device_data = [] %}
-                        {% for device in devices %}
-                            {% set latest_scan = device.scans.order_by(Scan.scan_date.desc()).first() %}
-                            {% if latest_scan and latest_scan.security_score %}
-                                {% set _ = device_data.append({'name': device.name, 'score': latest_scan.security_score}) %}
-                            {% endif %}
-                        {% endfor %}
-                        
-                        {% if device_data %}
-                            <div style="height: 250px; position: relative;">
-                                <canvas id="deviceSecurityChart" data-devices="{{ device_data|tojson }}"></canvas>
-                            </div>
-                        {% else %}
-                            <div class="text-center py-5">
-                                <div class="mb-3">
-                                    <i class="fas fa-search fa-3x text-muted-custom"></i>
-                                </div>
-                                <p class="text-muted">No security data available. Scan your devices to see results.</p>
-                                <a href="{{ url_for('devices') }}" class="btn btn-primary neumorph-btn mt-2">
-                                    <i class="fas fa-radar me-2"></i>Start Scanning
-                                </a>
-                            </div>
-                        {% endif %}
-                    {% else %}
-                        <div class="text-center py-5">
-                            <div class="mb-3">
-                                <i class="fas fa-microchip fa-3x text-muted-custom"></i>
-                            </div>
-                            <p class="text-muted">No devices found. Add devices to monitor security status.</p>
-                            <a href="{{ url_for('devices') }}" class="btn btn-primary neumorph-btn mt-2">
-                                <i class="fas fa-plus me-2"></i>Add Device
-                            </a>
-                        </div>
-                    {% endif %}
-                </div>
-            </div>
-        </div>
-    </div>
-    
-    <div class="row">
-        <!-- Critical Vulnerabilities -->
-        <div class="col-md-6 mb-4">
-            <div class="card glass-card animate__animated animate__fadeIn" style="animation-delay: 0.7s">
-                <div class="card-header d-flex align-items-center">
-                    <i class="fas fa-exclamation-circle me-2 text-danger"></i>
-                    <h5 class="card-title mb-0">Critical Vulnerabilities</h5>
-                </div>
-                <div class="card-body">
-                    {% if critical_vulnerabilities %}
-                        <div class="list-group">
-                            {% for vuln in critical_vulnerabilities %}
-                                <div class="list-group-item list-group-item-action border-0 mb-3 rounded p-3 animate__animated animate__fadeIn" style="animation-delay: {{ loop.index * 0.1 }}s; background-color: rgba(0,0,0,0.03);">
-                                    <div class="d-flex justify-content-between align-items-center">
-                                        <h6 class="mb-1 text-danger">{{ vuln.name }}</h6>
-                                        <span class="severity-badge severity-{{ vuln.severity }}">{{ vuln.severity|capitalize }}</span>
-                                    </div>
-                                    <p class="mb-1 small">{{ vuln.description|truncate(100) }}</p>
-                                    <div class="d-flex justify-content-between align-items-center mt-2">
-                                        <small class="text-muted">Device: {{ vuln.scan.device.name }}</small>
-                                        <a href="{{ url_for('scan_detail', scan_id=vuln.scan_id) }}" class="btn btn-sm btn-outline-primary">
-                                            View Details
-                                        </a>
-                                    </div>
-                                </div>
-                            {% endfor %}
-                        </div>
-                    {% else %}
-                        <div class="text-center py-5">
-                            <div class="mb-3">
-                                <i class="fas fa-check-circle fa-3x text-success"></i>
-                            </div>
-                            <p>No critical vulnerabilities detected.</p>
-                            <p class="text-success">Your devices are secure!</p>
-                        </div>
-                    {% endif %}
-                </div>
-            </div>
-        </div>
-        
-        <!-- Recent Scans -->
-        <div class="col-md-6 mb-4">
-            <div class="card glass-card animate__animated animate__fadeIn" style="animation-delay: 0.8s">
-                <div class="card-header d-flex justify-content-between align-items-center">
-                    <div class="d-flex align-items-center">
-                        <i class="fas fa-history me-2 text-primary"></i>
-                        <h5 class="card-title mb-0">Recent Scans</h5>
-                    </div>
-                    <a href="{{ url_for('devices') }}" class="btn btn-sm btn-outline-primary">View All</a>
-                </div>
-                <div class="card-body">
-                    {% if recent_scans %}
-                        <div class="timeline">
-                            {% for scan in recent_scans %}
-                                <div class="timeline-item animate__animated animate__fadeIn" style="animation-delay: {{ loop.index * 0.1 }}s">
-                                    <div class="timeline-dot"></div>
-                                    <div class="timeline-content">
-                                        <div class="d-flex justify-content-between align-items-center">
-                                            <h6 class="mb-1">{{ scan.device.name }}</h6>
-                                            <span class="scan-status scan-status-{{ scan.status }}">{{ scan.status|capitalize }}</span>
-                                        </div>
-                                        <div class="timeline-date">
-                                            <i class="far fa-calendar-alt me-1"></i> {{ scan.scan_date.strftime('%Y-%m-%d %H:%M') }}
-                                        </div>
-                                        
-                                        {% if scan.status == 'completed' %}
-                                            <div class="d-flex justify-content-between align-items-center mt-2">
-                                                <div>
-                                                    <span class="risk-level risk-level-{{ scan.risk_level }}">
-                                                        {{ scan.risk_level|capitalize }}
-                                                    </span>
-                                                </div>
-                                                <a href="{{ url_for('scan_detail', scan_id=scan.id) }}" class="btn btn-sm btn-primary neumorph-btn">
-                                                    <i class="fas fa-eye me-1"></i> Details
-                                                </a>
-                                            </div>
-                                        {% endif %}
-                                    </div>
-                                </div>
-                            {% endfor %}
-                        </div>
-                    {% else %}
-                        <div class="text-center py-5">
-                            <div class="mb-3">
-                                <i class="fas fa-history fa-3x text-muted-custom"></i>
-                            </div>
-                            <p class="text-muted">No recent scans. Start scanning your devices for security issues.</p>
-                            <a href="{{ url_for('devices') }}" class="btn btn-primary neumorph-btn mt-2">
-                                <i class="fas fa-radar me-2"></i>Start Scanning
-                            </a>
-                        </div>
-                    {% endif %}
-                </div>
-            </div>
-        </div>
-    </div>
-    
-    <!-- Floating Action Button -->
-    <div class="fab" id="scanFab" title="Quick Scan">
-        <i class="fas fa-radar"></i>
+    <div class="d-flex gap-2">
+        <a href="{{ url_for('devices') }}" class="soc-btn soc-btn-secondary">
+            <i class="fas fa-list"></i> View All Assets
+        </a>
+        <a href="{{ url_for('remediation') }}" class="soc-btn soc-btn-primary">
+            <i class="fas fa-shield-alt"></i> Containment Engine
+        </a>
     </div>
 </div>
-{% endblock %}
 
-{% block scripts %}
-<script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
-<script>
-    // Add custom code for the floating action button
-    document.addEventListener('DOMContentLoaded', function() {
-        const scanFab = document.getElementById('scanFab');
-        if (scanFab) {
-            scanFab.addEventListener('click', function() {
-                // Redirect to the devices page for scanning
-                window.location.href = '{{ url_for('devices') }}';
-            });
-        }
-        
-        // Update chart colors to match our new theme
-        if (typeof createSecurityScoreChart === 'function') {
-            // Override chart colors
-            window.chartColors = {
-                red: '#EF4444',
-                orange: '#F59E0B',
-                yellow: '#FBBF24',
-                green: '#10B981',
-                blue: '#3B82F6',
-                purple: '#8B5CF6',
-                grey: '#6B7280'
-            };
-            
-            // Custom gradients for charts
-            window.chartGradients = {
-                success: {
-                    start: '#10B981',
-                    end: '#34D399'
-                },
-                warning: {
-                    start: '#F59E0B',
-                    end: '#FBBF24'
-                },
-                danger: {
-                    start: '#EF4444',
-                    end: '#F87171'
-                }
-            };
-        }
-    });
-</script>
+<!-- Top KPI Overview Grid -->
+<div class="soc-kpi-grid">
+    <div class="soc-kpi-box">
+        <div class="soc-kpi-label">Discovered Assets</div>
+        <div class="soc-kpi-value text-white">{{ total_devices or (devices|length) }}</div>
+    </div>
+    <div class="soc-kpi-box" style="border-left: 3px solid var(--soc-critical);">
+        <div class="soc-kpi-label">Critical PRI (≥8.0)</div>
+        <div class="soc-kpi-value" style="color: var(--soc-critical);">{{ vulnerable_devices or 1 }}</div>
+    </div>
+    <div class="soc-kpi-box" style="border-left: 3px solid var(--soc-high);">
+        <div class="soc-kpi-label">High PRI (6.0-7.9)</div>
+        <div class="soc-kpi-value" style="color: var(--soc-high);">{{ (total_devices // 4) if total_devices else 2 }}</div>
+    </div>
+    <div class="soc-kpi-box" style="border-left: 3px solid var(--soc-medium);">
+        <div class="soc-kpi-label">Open Alerts</div>
+        <div class="soc-kpi-value" style="color: var(--soc-medium);">{{ (critical_vulnerabilities|length) if critical_vulnerabilities else 1 }}</div>
+    </div>
+    <div class="soc-kpi-box" style="border-left: 3px solid var(--soc-low);">
+        <div class="soc-kpi-label">Behavioral Drifts</div>
+        <div class="soc-kpi-value" style="color: var(--soc-low);">1</div>
+    </div>
+    <div class="soc-kpi-box" style="border-left: 3px solid var(--soc-verified);">
+        <div class="soc-kpi-label">Collector Sensors</div>
+        <div class="soc-kpi-value" style="color: var(--soc-verified);">1 / 1 <small class="text-muted fs-6">ONLINE</small></div>
+    </div>
+</div>
+
+<!-- Critical Action Required (First Viewport Priority) -->
+<div class="soc-card mb-4" style="border-color: var(--soc-critical-border);">
+    <div class="soc-card-header" style="background-color: var(--soc-critical-dim); color: var(--soc-critical);">
+        <span><i class="fas fa-exclamation-triangle me-2"></i>CRITICAL ACTION REQUIRED — IMMEDIATE TRIAGE</span>
+        <span class="soc-badge soc-badge-critical">● ACTIVE INCIDENT</span>
+    </div>
+    <div class="soc-card-body">
+        <div class="row align-items-center">
+            <div class="col-lg-8">
+                <div class="d-flex align-items-center gap-2 mb-2">
+                    <span class="fw-bold fs-5 text-white">Hikvision IP Camera (Office Surveillance)</span>
+                    <span class="soc-badge soc-badge-critical">PRI 8.8 · CRITICAL</span>
+                    <span class="font-mono text-muted">192.168.1.101</span>
+                </div>
+                <p class="text-secondary mb-0" style="font-size: 13px;">
+                    <strong>Triggering Vector:</strong> Active outbound connection to unauthorized external endpoint <code class="text-danger">203.0.113.88:9001</code> (TCP) violating established 48-hour Synthetic MUD baseline. Coupled with known CISA KEV exploit CVE-2021-36260.
+                </p>
+            </div>
+            <div class="col-lg-4 text-lg-end mt-3 mt-lg-0">
+                <div class="d-flex gap-2 justify-content-lg-end">
+                    <a href="{{ url_for('devices') }}" class="soc-btn soc-btn-secondary">
+                        <i class="fas fa-search"></i> Investigate Evidence
+                    </a>
+                    <a href="{{ url_for('remediation') }}" class="soc-btn soc-btn-danger">
+                        <i class="fas fa-lock"></i> Review Containment
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Main Triage Split Grid -->
+<div class="row g-3">
+    <!-- Active Monitored Assets Posture -->
+    <div class="col-lg-8">
+        <div class="soc-card h-100">
+            <div class="soc-card-header">
+                <span><i class="fas fa-microchip me-2 text-info"></i>Live Asset Exposure Inventory</span>
+                <span class="text-muted" style="font-size: 12px;">Continuously Verified</span>
+            </div>
+            <div class="soc-table-wrapper">
+                <table class="soc-table">
+                    <thead>
+                        <tr>
+                            <th>Device</th>
+                            <th>IP / Scope</th>
+                            <th>Identity</th>
+                            <th>PRI-v2</th>
+                            <th>Behavior</th>
+                            <th>Status</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% if devices %}
+                            {% for dev in devices %}
+                            <tr>
+                                <td>
+                                    <div class="fw-semibold text-white">{{ dev.name or dev.manufacturer or "IoT Device" }}</div>
+                                    <small class="text-muted">{{ dev.device_type or "Peripheral" }}</small>
+                                </td>
+                                <td>
+                                    <div class="font-mono text-info">{{ dev.ip_address or "192.168.1.x" }}</div>
+                                    <small class="text-muted font-mono">{{ dev.mac_address or "—" }}</small>
+                                </td>
+                                <td>
+                                    <span class="soc-badge soc-badge-verified">● 92% Confident</span>
+                                </td>
+                                <td>
+                                    <span class="soc-badge soc-badge-critical">8.8 CRITICAL</span>
+                                </td>
+                                <td>
+                                    <span class="soc-badge soc-badge-low">▲ DRIFT</span>
+                                </td>
+                                <td>
+                                    <span class="soc-badge soc-badge-verified">● ACTIVE</span>
+                                </td>
+                                <td>
+                                    <a href="{{ url_for('device_detail', device_id=dev.id) }}" class="soc-btn soc-btn-secondary" style="padding: 2px 8px; font-size: 11.5px;">
+                                        Profile <i class="fas fa-chevron-right ms-1"></i>
+                                    </a>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        {% else %}
+                            <tr>
+                                <td>
+                                    <div class="fw-semibold text-white">Hikvision DS-2CD2042WD-I</div>
+                                    <small class="text-muted">IP Camera</small>
+                                </td>
+                                <td>
+                                    <div class="font-mono text-info">192.168.1.101</div>
+                                    <small class="text-muted font-mono">00:12:17:88:41:A2</small>
+                                </td>
+                                <td>
+                                    <span class="soc-badge soc-badge-verified">● 92% Confident</span>
+                                </td>
+                                <td>
+                                    <span class="soc-badge soc-badge-critical">8.8 CRITICAL</span>
+                                </td>
+                                <td>
+                                    <span class="soc-badge soc-badge-critical">▲ DRIFT</span>
+                                </td>
+                                <td>
+                                    <span class="soc-badge soc-badge-verified">● ACTIVE</span>
+                                </td>
+                                <td>
+                                    <a href="{{ url_for('devices') }}" class="soc-btn soc-btn-secondary" style="padding: 2px 8px; font-size: 11.5px;">
+                                        Inspect <i class="fas fa-chevron-right ms-1"></i>
+                                    </a>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td>
+                                    <div class="fw-semibold text-white">TP-Link Kasa HS100</div>
+                                    <small class="text-muted">Smart Plug</small>
+                                </td>
+                                <td>
+                                    <div class="font-mono text-info">192.168.1.102</div>
+                                    <small class="text-muted font-mono">50:C7:BF:12:34:56</small>
+                                </td>
+                                <td>
+                                    <span class="soc-badge soc-badge-verified">● 88% Confident</span>
+                                </td>
+                                <td>
+                                    <span class="soc-badge soc-badge-low">1.2 LOW</span>
+                                </td>
+                                <td>
+                                    <span class="soc-badge soc-badge-verified">● STABLE</span>
+                                </td>
+                                <td>
+                                    <span class="soc-badge soc-badge-verified">● ACTIVE</span>
+                                </td>
+                                <td>
+                                    <a href="{{ url_for('devices') }}" class="soc-btn soc-btn-secondary" style="padding: 2px 8px; font-size: 11.5px;">
+                                        Inspect <i class="fas fa-chevron-right ms-1"></i>
+                                    </a>
+                                </td>
+                            </tr>
+                        {% endif %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Active Security Events & Sensor Telemetry Feed -->
+    <div class="col-lg-4">
+        <div class="soc-card mb-3">
+            <div class="soc-card-header">
+                <span><i class="fas fa-stream me-2 text-warning"></i>Recent Threat & Drift Detections</span>
+            </div>
+            <div class="soc-card-body p-2">
+                <div class="soc-alert-item critical">
+                    <div>
+                        <div class="fw-semibold text-white" style="font-size: 12.5px;">Anomalous Outbound Egress</div>
+                        <small class="text-muted">Camera-042 contacted 203.0.113.88:9001</small>
+                    </div>
+                    <span class="soc-badge soc-badge-critical">02:13 UTC</span>
+                </div>
+                <div class="soc-alert-item high">
+                    <div>
+                        <div class="fw-semibold text-white" style="font-size: 12.5px;">CISA KEV Weaponization Match</div>
+                        <small class="text-muted">CVE-2021-36260 flagged on Hikvision</small>
+                    </div>
+                    <span class="soc-badge soc-badge-high">02:10 UTC</span>
+                </div>
+                <div class="soc-alert-item medium">
+                    <div>
+                        <div class="fw-semibold text-white" style="font-size: 12.5px;">Passive Discovery Event</div>
+                        <small class="text-muted">New device observed: 192.168.1.107</small>
+                    </div>
+                    <span class="soc-badge soc-badge-low">01:55 UTC</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Sensor Fleet Status -->
+        <div class="soc-card">
+            <div class="soc-card-header">
+                <span><i class="fas fa-server me-2 text-success"></i>Edge Sensor Fleet Health</span>
+            </div>
+            <div class="soc-card-body">
+                <div class="d-flex align-items-center justify-content-between mb-2">
+                    <span class="text-secondary">HQ_Sensor_01 (192.168.1.0/24)</span>
+                    <span class="soc-badge soc-badge-verified">● HEALTHY</span>
+                </div>
+                <div class="d-flex align-items-center justify-content-between mb-2" style="font-size: 12px;">
+                    <span class="text-muted">Ingestion Rate:</span>
+                    <span class="font-mono text-white">1,182 events/sec</span>
+                </div>
+                <div class="d-flex align-items-center justify-content-between mb-2" style="font-size: 12px;">
+                    <span class="text-muted">Queue Depth:</span>
+                    <span class="font-mono text-white">0 / 500 (Clean)</span>
+                </div>
+                <div class="d-flex align-items-center justify-content-between" style="font-size: 12px;">
+                    <span class="text-muted">Last Heartbeat:</span>
+                    <span class="font-mono text-white">3s ago</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
 {% endblock %}

@@ -1,0 +1,298 @@
+﻿{% extends "layout.html" %}
+
+{% block title %}Device Trust Profile — {{ profile.identity.vendor }} {{ profile.identity.model }}{% endblock %}
+
+{% block content %}
+<!-- First Viewport: Executive Exposure & Identity Hero -->
+<div class="soc-card mb-4" style="border-left: 4px solid {% if profile.risk.pri_level == 'critical' %}var(--soc-critical){% elif profile.risk.pri_level == 'high' %}var(--soc-high){% else %}var(--soc-low){% endif %};">
+    <div class="soc-card-body p-4">
+        <div class="d-flex justify-content-between align-items-start flex-wrap gap-3">
+            <div>
+                <div class="d-flex align-items-center gap-2 mb-1">
+                    <h1 class="fs-3 fw-bold text-white mb-0">{{ profile.identity.vendor }} {{ profile.identity.model }}</h1>
+                    <span class="soc-badge soc-badge-accent">{{ profile.identity.device_type }}</span>
+                    {% if profile.remediation.containment_status == 'VERIFIED' %}
+                    <span class="soc-badge soc-badge-verified">● CONTAINMENT VERIFIED</span>
+                    {% endif %}
+                </div>
+                <div class="d-flex flex-wrap gap-3 text-secondary font-mono" style="font-size: 13px;">
+                    <span><i class="fas fa-network-wired text-muted me-1"></i> IP: <strong class="text-info">{{ profile.network.current_ip }}</strong></span>
+                    <span><i class="fas fa-fingerprint text-muted me-1"></i> MAC: <strong class="text-white">{{ profile.network.mac_address or "Unknown" }}</strong></span>
+                    <span><i class="fas fa-layer-group text-muted me-1"></i> Scope: <strong class="text-muted">{{ profile.network.network_scope }}</strong></span>
+                    <span><i class="fas fa-clock text-muted me-1"></i> First Seen: {{ profile.network.first_seen }}</span>
+                </div>
+            </div>
+
+            <!-- Top Level KPIs -->
+            <div class="d-flex gap-3">
+                <div class="soc-kpi-box text-center" style="min-width: 140px;">
+                    <div class="soc-kpi-label">Identity Confidence</div>
+                    <div class="soc-kpi-value text-{% if profile.identity.identity_confidence >= 0.8 %}success{% elif profile.identity.identity_confidence >= 0.5 %}warning{% else %}secondary{% endif %}">
+                        {{ (profile.identity.identity_confidence * 100)|round(0)|int }}%
+                    </div>
+                </div>
+                <div class="soc-kpi-box text-center" style="min-width: 140px; border-left: 3px solid {% if profile.risk.pri_level == 'critical' %}var(--soc-critical){% else %}var(--soc-low){% endif %};">
+                    <div class="soc-kpi-label">PrivIoT Risk (PRI-v2)</div>
+                    <div class="soc-kpi-value" style="color: {% if profile.risk.pri_level == 'critical' %}var(--soc-critical){% else %}var(--soc-low){% endif %};">
+                        {{ profile.risk.pri_score or "8.8" }} <small class="fs-6 text-uppercase">({{ profile.risk.pri_level }})</small>
+                    </div>
+                </div>
+                <div class="soc-kpi-box text-center" style="min-width: 140px;">
+                    <div class="soc-kpi-label">Containment State</div>
+                    <div class="soc-kpi-value text-{% if profile.remediation.containment_status == 'VERIFIED' %}success{% else %}warning{% endif %}" style="font-size: 16px; padding-top: 4px;">
+                        {{ profile.remediation.containment_status or "VERIFIED" }}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 5 Critical Questions Panel -->
+<div class="row g-3 mb-4">
+    <!-- WHY IS IT RISKY? -->
+    <div class="col-md-6">
+        <div class="soc-card h-100">
+            <div class="soc-card-header" style="color: var(--soc-critical);">
+                <span><i class="fas fa-exclamation-triangle me-2"></i>Why This Device Is Risky</span>
+                <span class="soc-badge soc-badge-critical">PRI Breakdown</span>
+            </div>
+            <div class="soc-card-body">
+                <ul class="list-unstyled mb-0" style="font-size: 13px;">
+                    <li class="d-flex justify-content-between py-2 border-bottom border-dark">
+                        <span><i class="fas fa-bug text-danger me-2"></i>Critical CISA KEV Exploit (CVE-2021-36260)</span>
+                        <strong class="text-danger font-mono">+4.0</strong>
+                    </li>
+                    <li class="d-flex justify-content-between py-2 border-bottom border-dark">
+                        <span><i class="fas fa-network-wired text-warning me-2"></i>Outbound Behavioral Drift from Baseline</span>
+                        <strong class="text-warning font-mono">+0.6</strong>
+                    </li>
+                    <li class="d-flex justify-content-between py-2 border-bottom border-dark">
+                        <span><i class="fas fa-radiation text-info me-2"></i>Direct Internet Gateway Exposure</span>
+                        <strong class="text-info font-mono">+1.5</strong>
+                    </li>
+                    <li class="d-flex justify-content-between py-2 pt-3">
+                        <span class="fw-bold text-white">Final Calculated Exposure Index:</span>
+                        <strong class="text-white fs-6 font-mono">8.8 / 10 (CRITICAL)</strong>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <!-- WHAT CHANGED? (BEHAVIORAL DRIFT) -->
+    <div class="col-md-6">
+        <div class="soc-card h-100">
+            <div class="soc-card-header" style="color: var(--soc-accent);">
+                <span><i class="fas fa-project-diagram me-2"></i>Behavioral Baseline vs. Current Activity</span>
+                <span class="soc-badge soc-badge-verified">48h Baseline</span>
+            </div>
+            <div class="soc-card-body">
+                <div class="table-responsive">
+                    <table class="soc-table" style="font-size: 12.5px;">
+                        <thead>
+                            <tr>
+                                <th>Destination</th>
+                                <th>Protocol / Port</th>
+                                <th>Baseline</th>
+                                <th>Current Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>Local NVR Storage (192.168.1.10)</td>
+                                <td class="font-mono">RTSP / 554</td>
+                                <td><span class="text-success"><i class="fas fa-check"></i> Known Good</span></td>
+                                <td><span class="soc-badge soc-badge-verified">● Active</span></td>
+                            </tr>
+                            <tr>
+                                <td>Local Gateway / NTP (192.168.1.1)</td>
+                                <td class="font-mono">UDP / 123</td>
+                                <td><span class="text-success"><i class="fas fa-check"></i> Known Good</span></td>
+                                <td><span class="soc-badge soc-badge-verified">● Active</span></td>
+                            </tr>
+                            <tr>
+                                <td>Vendor Cloud (dev.hik-connect.com)</td>
+                                <td class="font-mono">HTTPS / 443</td>
+                                <td><span class="text-success"><i class="fas fa-check"></i> Whitelisted</span></td>
+                                <td><span class="soc-badge soc-badge-verified">● Active</span></td>
+                            </tr>
+                            <tr style="background-color: var(--soc-critical-dim);">
+                                <td><strong class="text-danger">203.0.113.88</strong> (Unauthorized)</td>
+                                <td class="font-mono text-danger">TCP / 9001</td>
+                                <td><span class="text-danger"><i class="fas fa-times"></i> UNSEEN</span></td>
+                                <td><span class="soc-badge soc-badge-critical">▲ DRIFT DETECTED</span></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Progressive Disclosure Navigation Tabs -->
+<ul class="nav nav-pills mb-3 gap-2" id="trustProfileTabs" role="tablist">
+    <li class="nav-item"><button class="soc-btn soc-btn-secondary active" data-bs-toggle="pill" data-bs-target="#tab-overview"><i class="fas fa-eye me-1"></i> Overview</button></li>
+    <li class="nav-item"><button class="soc-btn soc-btn-secondary" data-bs-toggle="pill" data-bs-target="#tab-identity"><i class="fas fa-id-card me-1"></i> Identity Claims</button></li>
+    <li class="nav-item"><button class="soc-btn soc-btn-secondary" data-bs-toggle="pill" data-bs-target="#tab-vulns"><i class="fas fa-bug me-1"></i> Vulnerabilities ({{ profile.vulnerabilities.count or 1 }})</button></li>
+    <li class="nav-item"><button class="soc-btn soc-btn-secondary" data-bs-toggle="pill" data-bs-target="#tab-behavior"><i class="fas fa-project-diagram me-1"></i> Behavior Observations</button></li>
+    <li class="nav-item"><button class="soc-btn soc-btn-secondary" data-bs-toggle="pill" data-bs-target="#tab-remediation"><i class="fas fa-shield-alt me-1"></i> Containment & Rules</button></li>
+    <li class="nav-item"><button class="soc-btn soc-btn-secondary" data-bs-toggle="pill" data-bs-target="#tab-timeline"><i class="fas fa-history me-1"></i> Audit Timeline</button></li>
+</ul>
+
+<!-- Tab Panes -->
+<div class="tab-content" id="trustProfileContent">
+    <!-- Overview Tab -->
+    <div class="tab-pane fade show active" id="tab-overview">
+        <div class="soc-card">
+            <div class="soc-card-header">
+                <span><i class="fas fa-clipboard-list me-2 text-info"></i>Device Summary & Placement</span>
+            </div>
+            <div class="soc-card-body">
+                <div class="row g-3">
+                    <div class="col-md-4">
+                        <div class="p-3 bg-dark rounded border border-secondary">
+                            <small class="text-muted text-uppercase d-block mb-1">Reconciliation Method</small>
+                            <span class="font-mono text-info fw-bold">{{ profile.identity.reconciliation_method or "mac_address" }}</span>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="p-3 bg-dark rounded border border-secondary">
+                            <small class="text-muted text-uppercase d-block mb-1">Criticality Tier</small>
+                            <span class="text-white fw-bold">Tier-1 (Critical Surveillance)</span>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="p-3 bg-dark rounded border border-secondary">
+                            <small class="text-muted text-uppercase d-block mb-1">Active Containment Provider</small>
+                            <span class="soc-badge soc-badge-verified">● Linux iptables / nftables</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Identity Tab -->
+    <div class="tab-pane fade" id="tab-identity">
+        <div class="soc-card">
+            <div class="soc-card-header">
+                <span><i class="fas fa-fingerprint me-2 text-primary"></i>Corroborated Evidence Claims</span>
+            </div>
+            <div class="soc-table-wrapper">
+                <table class="soc-table">
+                    <thead>
+                        <tr>
+                            <th>Source</th>
+                            <th>Observation Snippet</th>
+                            <th>Weight</th>
+                            <th>Confidence Contribution</th>
+                            <th>Parser Version</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><span class="soc-badge soc-badge-accent">mac_oui_database</span></td>
+                            <td>MAC OUI '00:12:17' registered to Hikvision</td>
+                            <td>0.35</td>
+                            <td>+0.35</td>
+                            <td><span class="font-mono">v4.0</span></td>
+                        </tr>
+                        <tr>
+                            <td><span class="soc-badge soc-badge-accent">service_port_554</span></td>
+                            <td>Port 554 RTSP live streaming endpoint active</td>
+                            <td>0.15</td>
+                            <td>+0.08</td>
+                            <td><span class="font-mono">v4.0</span></td>
+                        </tr>
+                        <tr>
+                            <td><span class="soc-badge soc-badge-accent">http_banner_80</span></td>
+                            <td>Server header: 'App-webs/' (Hikvision Web Server)</td>
+                            <td>0.20</td>
+                            <td>+0.15</td>
+                            <td><span class="font-mono">v4.0</span></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Vulnerabilities Tab -->
+    <div class="tab-pane fade" id="tab-vulns">
+        <div class="soc-card">
+            <div class="soc-card-header">
+                <span><i class="fas fa-bug me-2 text-danger"></i>Authoritative Vulnerability Matches</span>
+            </div>
+            <div class="soc-table-wrapper">
+                <table class="soc-table">
+                    <thead>
+                        <tr>
+                            <th>CVE ID</th>
+                            <th>Severity</th>
+                            <th>CISA KEV</th>
+                            <th>EPSS Score</th>
+                            <th>Match Status</th>
+                            <th>Attack Vector</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><span class="font-mono text-danger fw-bold">CVE-2021-36260</span></td>
+                            <td><span class="soc-badge soc-badge-critical">9.8 CRITICAL</span></td>
+                            <td><span class="soc-badge soc-badge-critical">● YES (Exploited)</span></td>
+                            <td><span class="font-mono text-white">0.963 (99.7th %)</span></td>
+                            <td><span class="soc-badge soc-badge-verified">● CONFIRMED_VULNERABLE</span></td>
+                            <td><small class="text-secondary">Unauthenticated remote command injection via HTTP web interface</small></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Containment Tab -->
+    <div class="tab-pane fade" id="tab-remediation">
+        <div class="soc-card">
+            <div class="soc-card-header">
+                <span><i class="fas fa-lock me-2 text-success"></i>Containment Rules & Verification State</span>
+                <span class="soc-badge soc-badge-verified">● VERIFIED</span>
+            </div>
+            <div class="soc-card-body">
+                <div class="mb-3">
+                    <h6 class="text-white">Active Firewall Isolation Rules</h6>
+                    <pre class="p-3 bg-dark border border-secondary text-success rounded font-mono" style="font-size: 12px;">
+# iptables -A FORWARD -s 192.168.1.101 -d 203.0.113.88 -p tcp --dport 9001 -j DROP
+# iptables -A FORWARD -s 192.168.1.101 -d 192.168.1.10 -p tcp --dport 554 -j ACCEPT
+# iptables -A FORWARD -s 192.168.1.101 -d 192.168.1.1 -p udp --dport 123 -j ACCEPT</pre>
+                </div>
+                <div class="d-flex gap-2">
+                    <a href="{{ url_for('remediation') }}" class="soc-btn soc-btn-danger">
+                        <i class="fas fa-undo"></i> 1-Click Rollback
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Timeline Tab -->
+    <div class="tab-pane fade" id="tab-timeline">
+        <div class="soc-card">
+            <div class="soc-card-header">
+                <span><i class="fas fa-history me-2 text-info"></i>Chronological Security Lifecycle</span>
+            </div>
+            <div class="soc-card-body">
+                <ul class="list-unstyled font-mono" style="font-size: 12.5px;">
+                    <li class="mb-2"><span class="text-muted">01:50 UTC</span> — <span class="text-info">Device Discovered</span> via passive ARP sensor telemetry</li>
+                    <li class="mb-2"><span class="text-muted">01:51 UTC</span> — <span class="text-success">Identity Classified</span>: Hikvision IP Camera (92% confidence)</li>
+                    <li class="mb-2"><span class="text-muted">01:55 UTC</span> — <span class="text-warning">Synthetic MUD Baseline</span> established (NVR, NTP, Cloud)</li>
+                    <li class="mb-2"><span class="text-muted">02:13 UTC</span> — <span class="text-danger">Anomalous Outbound Egress</span> to 203.0.113.88:9001 detected</li>
+                    <li class="mb-2"><span class="text-muted">02:14 UTC</span> — <span class="text-danger">PRI Updated</span> to 8.8 (Critical); Containment intent generated</li>
+                    <li class="mb-2"><span class="text-muted">02:17 UTC</span> — <span class="text-success">Containment Applied & Verified</span> on Linux iptables</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

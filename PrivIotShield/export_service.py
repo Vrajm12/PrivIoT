@@ -177,11 +177,12 @@ class ReportExporter:
                 
                 privacy_data = [['ID', 'Name', 'Severity', 'Impact']]
                 for issue in scan.privacy_issues.all():
+                    impact_val = f"{issue.privacy_impact:.1f}" if isinstance(issue.privacy_impact, (int, float)) else str(issue.privacy_impact or 'N/A')
                     privacy_data.append([
                         str(issue.id),
                         issue.name[:40] + '...' if len(issue.name) > 40 else issue.name,
                         issue.severity.upper(),
-                        issue.privacy_impact[:20] + '...' if len(issue.privacy_impact) > 20 else issue.privacy_impact
+                        impact_val
                     ])
                 
                 privacy_table = Table(privacy_data, colWidths=[0.5*inch, 3*inch, 1.2*inch, 1*inch])
@@ -198,8 +199,34 @@ class ReportExporter:
                 elements.append(privacy_table)
                 elements.append(Spacer(1, 20))
             
+            # Compliance Audit Section
+            scan_payload = scan.get_scan_data()
+            compliance = scan_payload.get('compliance_audit', {})
+            if compliance:
+                elements.append(Paragraph("Regulatory Compliance & Privacy Matrix", self.styles['SectionHeader']))
+                etsi = compliance.get('etsi_en_303_645', {})
+                nist = compliance.get('nist_ir_8259', {})
+                comp_data = [
+                    ['Standard', 'Scope', 'Status', 'Compliance %'],
+                    ['ETSI EN 303 645', 'EU Consumer IoT Security Baseline', etsi.get('status', 'N/A'), f"{etsi.get('compliance_percentage', 0)}%"],
+                    ['NIST IR 8259A', 'IoT Cybersecurity Capability Baseline', nist.get('status', 'N/A'), f"{nist.get('compliance_percentage', 0)}%"]
+                ]
+                comp_table = Table(comp_data, colWidths=[1.5*inch, 2.5*inch, 1.2*inch, 1.2*inch])
+                comp_table.setStyle(TableStyle([
+                    ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#0284c7')),
+                    ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+                    ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+                    ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                    ('FONTSIZE', (0, 0), (-1, 0), 9),
+                    ('GRID', (0, 0), (-1, -1), 1, colors.black),
+                    ('FONTSIZE', (0, 1), (-1, -1), 9),
+                    ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.lightgrey])
+                ]))
+                elements.append(comp_table)
+                elements.append(Spacer(1, 20))
+
             # Recommendations
-            elements.append(Paragraph("Recommendations", self.styles['SectionHeader']))
+            elements.append(Paragraph("Actionable Recommendations", self.styles['SectionHeader']))
             recommendations = self._generate_recommendations(scan)
             for i, rec in enumerate(recommendations, 1):
                 elements.append(Paragraph(f"{i}. {rec}", self.styles['Normal']))

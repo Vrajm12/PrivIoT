@@ -11,7 +11,14 @@ logger = logging.getLogger(__name__)
 
 # OpenAI configuration
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
-openai = OpenAI(api_key=OPENAI_API_KEY)
+if OPENAI_API_KEY:
+    try:
+        openai = OpenAI(api_key=OPENAI_API_KEY)
+    except Exception as e:
+        logger.error(f"Failed to initialize OpenAI client in device_fingerprinting: {str(e)}")
+        openai = None
+else:
+    openai = None
 
 class DeviceFingerprinter:
     """

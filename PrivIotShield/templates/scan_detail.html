@@ -261,9 +261,21 @@
                                     <div class="accordion-item vulnerability-item" data-vuln-id="{{ vuln.id }}">
                                         <h2 class="accordion-header" id="vulnHeading{{ vuln.id }}">
                                             <button class="accordion-button {{ 'collapsed' if not loop.first }}" type="button" data-bs-toggle="collapse" data-bs-target="#vulnCollapse{{ vuln.id }}" aria-expanded="{{ 'true' if loop.first else 'false' }}" aria-controls="vulnCollapse{{ vuln.id }}">
-                                                <div class="d-flex justify-content-between align-items-center w-100">
-                                                    <span>{{ vuln.name }}</span>
-                                                    <span class="severity-badge severity-{{ vuln.severity }} ms-2">{{ vuln.severity|capitalize }}</span>
+                                                <div class="d-flex justify-content-between align-items-center w-100 pe-3">
+                                                    <div>
+                                                        {% if 'CVE-' in vuln.name %}
+                                                            <span class="badge bg-secondary font-monospace me-2">{{ vuln.name.split(' ')[0] }}</span>
+                                                            <span class="fw-bold">{{ vuln.name.replace(vuln.name.split(' ')[0], '')|trim }}</span>
+                                                        {% else %}
+                                                            <span class="fw-bold">{{ vuln.name }}</span>
+                                                        {% endif %}
+                                                    </div>
+                                                    <div>
+                                                        {% if 'cisa' in vuln.description.lower() or vuln.cvss_score >= 9.0 %}
+                                                            <span class="badge bg-danger me-2"><i class="fas fa-biohazard me-1"></i>CISA KEV / High Weaponization</span>
+                                                        {% endif %}
+                                                        <span class="severity-badge severity-{{ vuln.severity }}">{{ vuln.severity|capitalize }}</span>
+                                                    </div>
                                                 </div>
                                             </button>
                                         </h2>
@@ -423,6 +435,154 @@
             </div>
         </div>
         
+        {% set scan_payload = scan.get_scan_data() %}
+        {% set compliance = scan_payload.get('compliance_audit', {}) %}
+        {% set etsi = compliance.get('etsi_en_303_645', {}) %}
+        {% set nist = compliance.get('nist_ir_8259', {}) %}
+        {% set rem_scripts = scan_payload.get('remediation_scripts', {}) %}
+
+        <!-- Regulatory & Privacy Compliance Matrix -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card border-info">
+                    <div class="card-header bg-info bg-opacity-10 d-flex justify-content-between align-items-center">
+                        <h5 class="card-title mb-0 text-info">
+                            <i class="fas fa-balance-scale me-2"></i>Regulatory & Privacy Compliance Matrix
+                        </h5>
+                        <span class="badge {{ 'bg-success' if compliance.get('overall_status') == 'COMPLIANT' else 'bg-warning text-dark' }}">
+                            {{ compliance.get('overall_status', 'EVALUATED') }} (Score: {{ compliance.get('privacy_compliance_score', 'N/A') }}/10)
+                        </span>
+                    </div>
+                    <div class="card-body">
+                        <div class="row g-4">
+                            <!-- ETSI EN 303 645 Card -->
+                            <div class="col-md-6">
+                                <div class="card h-100 bg-light">
+                                    <div class="card-header d-flex justify-content-between align-items-center">
+                                        <h6 class="mb-0 fw-bold">ETSI EN 303 645 (EU Consumer IoT)</h6>
+                                        <span class="badge {{ 'bg-success' if etsi.get('status') == 'COMPLIANT' else 'bg-danger' }}">
+                                            {{ etsi.get('compliance_percentage', 0) }}% Pass
+                                        </span>
+                                    </div>
+                                    <div class="card-body p-3">
+                                        <ul class="list-group list-group-flush">
+                                            {% for prov in etsi.get('provisions', []) %}
+                                                <li class="list-group-item bg-transparent d-flex justify-content-between align-items-start px-0">
+                                                    <div class="ms-2 me-auto">
+                                                        <div class="fw-bold small">{{ prov.id }}: {{ prov.title }}</div>
+                                                        <span class="text-muted" style="font-size: 0.8rem;">{{ prov.rationale }}</span>
+                                                    </div>
+                                                    <span class="badge {{ 'bg-success' if prov.status == 'PASS' else 'bg-danger' if prov.status == 'FAIL' else 'bg-warning text-dark' }}">
+                                                        {{ prov.status }}
+                                                    </span>
+                                                </li>
+                                            {% endfor %}
+                                        </ul>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- NIST IR 8259A Card -->
+                            <div class="col-md-6">
+                                <div class="card h-100 bg-light">
+                                    <div class="card-header d-flex justify-content-between align-items-center">
+                                        <h6 class="mb-0 fw-bold">NIST IR 8259A (Cybersecurity Baseline)</h6>
+                                        <span class="badge {{ 'bg-success' if nist.get('status') == 'COMPLIANT' else 'bg-warning text-dark' }}">
+                                            {{ nist.get('compliance_percentage', 0) }}% Pass
+                                        </span>
+                                    </div>
+                                    <div class="card-body p-3">
+                                        <ul class="list-group list-group-flush">
+                                            {% for cap in nist.get('capabilities', []) %}
+                                                <li class="list-group-item bg-transparent d-flex justify-content-between align-items-start px-0">
+                                                    <div class="ms-2 me-auto">
+                                                        <div class="fw-bold small">{{ cap.capability }}</div>
+                                                        <span class="text-muted" style="font-size: 0.8rem;">{{ cap.description }}</span>
+                                                    </div>
+                                                    <span class="badge {{ 'bg-success' if cap.status == 'PASS' else 'bg-danger' }}">
+                                                        {{ cap.status }}
+                                                    </span>
+                                                </li>
+                                            {% endfor %}
+                                        </ul>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Automated Quarantine & Containment Scripts -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card border-danger">
+                    <div class="card-header bg-danger bg-opacity-10 d-flex justify-content-between align-items-center">
+                        <h5 class="card-title mb-0 text-danger">
+                            <i class="fas fa-network-wired me-2"></i>Automated Defense & Firewall Quarantine Generator
+                        </h5>
+                        <span class="badge bg-danger">Ready-to-Deploy</span>
+                    </div>
+                    <div class="card-body">
+                        <p class="text-muted small">
+                            Production-grade isolation scripts generated specifically for this device (IP: <code>{{ scan.device.ip_address or '192.168.1.50' }}</code>, MAC: <code>{{ scan.device.mac_address or 'N/A' }}</code>) to prevent lateral movement and exfiltration.
+                        </p>
+                        
+                        <!-- Nav tabs -->
+                        <ul class="nav nav-tabs mb-3" id="firewallTabs" role="tablist">
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link active" id="iptables-tab" data-bs-toggle="tab" data-bs-target="#tab-iptables" type="button" role="tab">Linux iptables</button>
+                            </li>
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link" id="nftables-tab" data-bs-toggle="tab" data-bs-target="#tab-nftables" type="button" role="tab">Linux nftables</button>
+                            </li>
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link" id="pfsense-tab" data-bs-toggle="tab" data-bs-target="#tab-pfsense" type="button" role="tab">pfSense / OPNsense</button>
+                            </li>
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link" id="unifi-tab" data-bs-toggle="tab" data-bs-target="#tab-unifi" type="button" role="tab">Ubiquiti UniFi</button>
+                            </li>
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link" id="mikrotik-tab" data-bs-toggle="tab" data-bs-target="#tab-mikrotik" type="button" role="tab">MikroTik RouterOS</button>
+                            </li>
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link" id="dns-tab" data-bs-toggle="tab" data-bs-target="#tab-dns" type="button" role="tab">Pi-hole DNS Sinkhole</button>
+                            </li>
+                        </ul>
+
+                        <!-- Tab panes -->
+                        <div class="tab-content" id="firewallTabsContent">
+                            <div class="tab-pane fade show active" id="tab-iptables" role="tabpanel">
+                                <pre class="bg-dark text-light p-3 rounded mb-0" style="max-height: 250px; overflow-y: auto;"><code>{{ rem_scripts.get('iptables', '# iptables rules') }}</code></pre>
+                            </div>
+                            <div class="tab-pane fade" id="tab-nftables" role="tabpanel">
+                                <pre class="bg-dark text-light p-3 rounded mb-0" style="max-height: 250px; overflow-y: auto;"><code>{{ rem_scripts.get('nftables', '# nftables rules') }}</code></pre>
+                            </div>
+                            <div class="tab-pane fade" id="tab-pfsense" role="tabpanel">
+                                <pre class="bg-dark text-light p-3 rounded mb-0" style="max-height: 250px; overflow-y: auto;"><code>{{ rem_scripts.get('pfsense', '# pfSense XML rules') }}</code></pre>
+                            </div>
+                            <div class="tab-pane fade" id="tab-unifi" role="tabpanel">
+                                <pre class="bg-dark text-light p-3 rounded mb-0" style="max-height: 250px; overflow-y: auto;"><code>{{ rem_scripts.get('unifi', '# UniFi CLI rules') }}</code></pre>
+                            </div>
+                            <div class="tab-pane fade" id="tab-mikrotik" role="tabpanel">
+                                <pre class="bg-dark text-light p-3 rounded mb-0" style="max-height: 250px; overflow-y: auto;"><code>{{ rem_scripts.get('mikrotik', '# MikroTik script') }}</code></pre>
+                            </div>
+                            <div class="tab-pane fade" id="tab-dns" role="tabpanel">
+                                <ul class="list-group">
+                                    {% for domain in rem_scripts.get('dns_sinkhole', []) %}
+                                        <li class="list-group-item list-group-item-warning py-1 font-monospace small">{{ domain }}</li>
+                                    {% else %}
+                                        <li class="list-group-item text-muted">No telemetry blocklist entries required.</li>
+                                    {% endfor %}
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- Raw Scan Data (for advanced users) -->
         <div class="row">
             <div class="col-12">

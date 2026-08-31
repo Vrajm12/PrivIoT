@@ -100,6 +100,7 @@ def index():
 
 
 @app.route('/login', methods=['GET', 'POST'])
+@csrf.exempt
 def login():
     if current_user.is_authenticated:
         return redirect(url_for('dashboard'))
@@ -128,6 +129,7 @@ def login():
 
 
 @app.route('/register', methods=['GET', 'POST'])
+@csrf.exempt
 def register():
     if current_user.is_authenticated:
         return redirect(url_for('dashboard'))
@@ -292,17 +294,58 @@ def devices():
 @app.route('/device/<int:device_id>')
 @login_required
 def device_detail(device_id):
-    device = Device.query.get_or_404(device_id)
+    from models import Asset
+    asset = Asset.query.filter_by(id=device_id).first()
+    if asset:
+        profile = asset.get_trust_profile()
+        return render_template('trust_profile.html', profile=profile, asset=asset)
     
-    # Check if the device belongs to the current user
+    device = Device.query.get_or_404(device_id)
     if device.user_id != current_user.id and current_user.role != 'admin':
         flash('You do not have permission to view this device.', 'danger')
         return redirect(url_for('devices'))
     
-    # Get the most recent scan
     latest_scan = Scan.query.filter_by(device_id=device.id).order_by(Scan.scan_date.desc()).first()
-    
     return render_template('device_detail.html', device=device, latest_scan=latest_scan)
+
+
+@app.route('/assets/<int:asset_id>/trust-profile')
+@login_required
+def device_trust_profile(asset_id):
+    """Flagship Device Trust Profile Screen."""
+    from models import Asset
+    asset = Asset.query.filter_by(id=asset_id, user_id=current_user.id).first_or_404()
+    profile = asset.get_trust_profile()
+    return render_template('trust_profile.html', profile=profile, asset=asset)
+
+
+@app.route('/alerts')
+@login_required
+def alerts_view():
+    """Operational security alerts screen."""
+    from models import Alert
+    alerts = Alert.query.order_by(Alert.created_at.desc()).all()
+    return render_template('alerts.html', alerts=alerts)
+
+
+@app.route('/alerts/<int:alert_id>')
+@login_required
+def alert_detail_view(alert_id):
+    """Explicit 'Why did this alert fire?' detail view."""
+    from models import Alert
+    alert = Alert.query.get_or_404(alert_id)
+    return render_template('alert_detail.html', alert=alert)
+
+
+@app.route('/audit')
+@login_required
+def audit_timeline_view():
+    """Chronological immutable security timeline."""
+    from models import AuditEvent
+    events = AuditEvent.query.order_by(AuditEvent.timestamp.desc()).limit(200).all()
+    return render_template('audit_timeline.html', events=events)
+
+
 
 
 @app.route('/device/<int:device_id>/scan', methods=['POST'])
@@ -599,6 +642,7 @@ def update_vulnerability_status(vuln_id):
 
 
 @app.route('/api_docs')
+@app.route('/api-docs')
 @login_required
 def api_docs():
     return render_template('api_docs.html', api_key=current_user.api_key)
@@ -1120,6 +1164,7 @@ def network_scan_page():
 
 @app.route('/api/network-scan/start', methods=['POST'])
 @login_required
+@csrf.exempt
 def start_network_scan():
     """Start automatic network scanning"""
     try:
@@ -1149,6 +1194,7 @@ def start_network_scan():
 
 @app.route('/api/device/import', methods=['POST'])
 @login_required
+@csrf.exempt
 def import_discovered_device():
     """Import a discovered device into the system"""
     try:
@@ -1196,6 +1242,7 @@ def trends_page():
 
 @app.route('/api/trends/device/<int:device_id>')
 @login_required
+@csrf.exempt
 def device_trends(device_id):
     """Get trend analysis for a specific device"""
     try:
@@ -1218,6 +1265,7 @@ def device_trends(device_id):
 
 @app.route('/api/trends/global')
 @login_required
+@csrf.exempt
 def global_trends():
     """Get global trend analysis for all user devices"""
     try:
@@ -1304,6 +1352,7 @@ def export_report(report_id, format):
 
 
 @app.route('/tips')
+@app.route('/security-tips')
 @login_required
 def security_tips():
     """Security tips and best practices page"""
@@ -1318,6 +1367,7 @@ def security_tips():
 
 @app.route('/api/tips/personalized')
 @login_required
+@csrf.exempt
 def get_personalized_tips():
     """Get personalized security tips based on user's devices and scans"""
     try:

@@ -1,283 +1,197 @@
-<!DOCTYPE html>
-<html lang="en" data-theme="{{ theme }}">
+﻿<!DOCTYPE html>
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="csrf-token" content="{{ csrf_token() }}">
-    <title>{% block title %}PrivIoT - IoT Security Analyzer{% endblock %}</title>
+    <meta name="csrf-token" content="{{ csrf_token() if csrf_token else '' }}">
+    <title>{% block title %}PrivIoT Shield — Continuous IoT Exposure Management{% endblock %}</title>
     
-    <!-- Bootstrap 5 CSS -->
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-rbsA2VBKQhggwzxH7pPCaAqO46MgnOM80zW1RWuH61DGLwZJEdK2Kadq2F9CUG65" crossorigin="anonymous">
-    
-    <!-- Font Awesome Icons -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" integrity="sha512-9usAa10IRO0HhonpyAIVpjrylPvoDwiPUiKdWk5t3PyolY1cOd4DSE0Ga+ri4AuTroPR5aQvXU9xC6qOPnzFeg==" crossorigin="anonymous" referrerpolicy="no-referrer" />
-    
-    <!-- Google Fonts - Inter -->
+    <!-- Fonts: Inter & Fira Code -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     
-    <!-- Fira Code for monospace elements -->
-    <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+    
+    <!-- Bootstrap 5 Grid / Utilities -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    
+    <!-- SOC Design System CSS -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/soc_theme.css') }}">
     
     <!-- Chart.js -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
     
-    <!-- Animate.css for animations -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css">
-    
-    <!-- Custom CSS -->
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/neumorphic.css') }}">
-    
     {% block head %}{% endblock %}
 </head>
-<body class="page-transition">
+<body>
     {% if current_user.is_authenticated %}
-    <!-- Navigation for logged-in users -->
-    <nav class="navbar navbar-expand-lg navbar-dark">
-        <div class="container">
-            <a class="navbar-brand" href="{{ url_for('dashboard') }}">
-                <i class="fas fa-shield-alt me-2"></i>PrivIoT
+    <div class="soc-app-wrapper">
+        <!-- Left Navigation Sidebar -->
+        <aside class="soc-sidebar">
+            <a href="{{ url_for('dashboard') }}" class="soc-brand">
+                <i class="fas fa-shield-alt soc-brand-icon"></i>
+                <span>PrivIoT <span style="color: var(--soc-accent); font-weight: 800;">SHIELD</span></span>
             </a>
-            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
-                <span class="navbar-toggler-icon"></span>
-            </button>
-            <div class="collapse navbar-collapse" id="navbarNav">
-                <ul class="navbar-nav me-auto">
-                    <li class="nav-item">
-                        <a class="nav-link {% if request.path == url_for('dashboard') %}active{% endif %}" href="{{ url_for('dashboard') }}">
-                            <i class="fas fa-tachometer-alt me-1"></i> Dashboard
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link {% if request.path == url_for('devices') %}active{% endif %}" href="{{ url_for('devices') }}">
-                            <i class="fas fa-microchip me-1"></i> Devices
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link {% if request.path == url_for('reports') %}active{% endif %}" href="{{ url_for('reports') }}">
-                            <i class="fas fa-file-alt me-1"></i> Reports
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link {% if request.path == url_for('remediation') %}active{% endif %}" href="{{ url_for('remediation') }}">
-                            <i class="fas fa-tools me-1"></i> Remediation
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link {% if request.path == url_for('network_scan_page') %}active{% endif %}" href="{{ url_for('network_scan_page') }}">
-                            <i class="fas fa-network-wired me-1"></i> Network Scan
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link {% if request.path == url_for('trends_page') %}active{% endif %}" href="{{ url_for('trends_page') }}">
-                            <i class="fas fa-chart-line me-1"></i> Trends
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link {% if request.path == url_for('security_tips') %}active{% endif %}" href="{{ url_for('security_tips') }}">
-                            <i class="fas fa-lightbulb me-1"></i> Tips
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link {% if request.path == url_for('api_docs') %}active{% endif %}" href="{{ url_for('api_docs') }}">
-                            <i class="fas fa-code me-1"></i> API
-                        </a>
-                    </li>
-                </ul>
-                <ul class="navbar-nav ms-auto">
-                    <li class="nav-item">
-                        <a href="{{ url_for('alerts') }}" class="nav-link position-relative">
-                            <i class="fas fa-bell me-1"></i> Alerts
-                            <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger">
-                                {{ alerts_count if alerts_count else "0" }}
-                                <span class="visually-hidden">unread alerts</span>
-                            </span>
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a href="{{ url_for('toggle_theme') }}" class="nav-link" id="themeToggleLink">
-                            {% if theme == 'light' %}
-                            <i class="fas fa-moon me-1"></i> Dark Mode
-                            {% else %}
-                            <i class="fas fa-sun me-1"></i> Light Mode
-                            {% endif %}
-                        </a>
-                    </li>
-                    <li class="nav-item dropdown">
-                        <a class="nav-link dropdown-toggle" href="#" id="userDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
-                            <i class="fas fa-user-circle me-1"></i> {{ current_user.username }}
-                        </a>
-                        <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="userDropdown">
-                            <li>
-                                <a class="dropdown-item" href="{{ url_for('profile') }}">
-                                    <i class="fas fa-id-card me-2"></i> Profile
-                                </a>
-                            </li>
-                            <li>
-                                <a class="dropdown-item" href="{{ url_for('alerts') }}">
-                                    <i class="fas fa-bell me-2"></i> Alerts
-                                    {% if alerts_count and alerts_count > 0 %}
-                                    <span class="badge rounded-pill bg-danger ms-2">{{ alerts_count }}</span>
-                                    {% endif %}
-                                </a>
-                            </li>
-                            <li><hr class="dropdown-divider"></li>
-                            <li>
-                                <a class="dropdown-item" href="{{ url_for('logout') }}">
-                                    <i class="fas fa-sign-out-alt me-2"></i> Logout
-                                </a>
-                            </li>
-                        </ul>
-                    </li>
-                </ul>
-            </div>
-        </div>
-    </nav>
-    {% endif %}
-    
-    <!-- Flash Messages -->
-    <div class="container mt-3">
-        {% with messages = get_flashed_messages(with_categories=true) %}
-            {% if messages %}
-                {% for category, message in messages %}
-                    <div class="alert alert-{{ category }} alert-dismissible fade show animate__animated animate__fadeIn" role="alert">
-                        {{ message }}
-                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-                    </div>
-                {% endfor %}
-            {% endif %}
-        {% endwith %}
-    </div>
-    
-    <!-- Main Content -->
-    <main class="py-4">
-        {% block content %}{% endblock %}
-    </main>
-    
-    <!-- Footer -->
-    <footer class="footer mt-auto py-3">
-        <div class="container">
-            <div class="row">
-                <div class="col-md-6">
-                    <p class="mb-0">&copy; 2025 PrivIoT. All rights reserved.</p>
-                </div>
-                <div class="col-md-6 text-md-end">
-                    <a href="#" class="text-muted me-3">Privacy Policy</a>
-                    <a href="#" class="text-muted me-3">Terms of Service</a>
-                    <a href="#" class="text-muted">Contact</a>
-                </div>
-            </div>
-        </div>
-    </footer>
-    
-    <!-- Theme toggle button -->
-    <div class="theme-toggle" id="themeToggle" title="Toggle theme">
-        <i class="fas {% if theme == 'light' %}fa-moon{% else %}fa-sun{% endif %}"></i>
-    </div>
-    
-    <!-- Bootstrap 5 JS Bundle with Popper -->
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/js/bootstrap.bundle.min.js" integrity="sha384-kenU1KFdBIe4zVF0s0G1M5b4hcpxyD9F7jL+jjXkk+Q2h455rYXK/7HAuoJl+0I4" crossorigin="anonymous"></script>
-    
-    <!-- Custom Charts JS -->
-    <script src="{{ url_for('static', filename='js/charts.js') }}"></script>
-    
-    <!-- Page-specific scripts -->
-    {% block scripts %}{% endblock %}
-    
-    <!-- Animation script for elements -->
-    <script>
-    document.addEventListener('DOMContentLoaded', function() {
-        // Add animation classes to cards
-        document.querySelectorAll('.card:not(.glass-card)').forEach(function(card, index) {
-            card.classList.add('animate__animated', 'animate__fadeIn');
-            card.style.animationDelay = (index * 0.1) + 's';
-        });
-        
-        // Activate animate-on-scroll elements
-        const animateElements = document.querySelectorAll('.animate-on-scroll');
-        if (animateElements.length > 0) {
-            const observer = new IntersectionObserver((entries) => {
-                entries.forEach(entry => {
-                    if (entry.isIntersecting) {
-                        entry.target.classList.add('visible');
-                        observer.unobserve(entry.target);
-                    }
-                });
-            }, {
-                threshold: 0.1
-            });
             
-            animateElements.forEach(element => {
-                observer.observe(element);
-            });
-        }
-        
-        // Handle theme toggle
-        const themeToggle = document.getElementById('themeToggle');
-        const themeToggleLink = document.getElementById('themeToggleLink');
-        
-        if (themeToggle) {
-            themeToggle.addEventListener('click', function() {
-                const currentTheme = document.documentElement.getAttribute('data-theme') || 'dark';
-                const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+            <ul class="soc-nav-menu">
+                <li class="soc-nav-item">
+                    <a href="{{ url_for('dashboard') }}" class="soc-nav-link {% if request.path == url_for('dashboard') %}active{% endif %}">
+                        <i class="fas fa-tachometer-alt"></i> Dashboard
+                    </a>
+                </li>
+                <li class="soc-nav-item">
+                    <a href="{{ url_for('devices') }}" class="soc-nav-link {% if request.path == url_for('devices') or '/trust-profile/' in request.path or '/device/' in request.path %}active{% endif %}">
+                        <i class="fas fa-microchip"></i> Assets
+                    </a>
+                </li>
+                <li class="soc-nav-item">
+                    <a href="{{ url_for('alerts') }}" class="soc-nav-link {% if request.path == url_for('alerts') or '/alerts/' in request.path %}active{% endif %}">
+                        <i class="fas fa-bell"></i> Alerts
+                        <span class="soc-nav-badge soc-badge-critical ms-auto">Active</span>
+                    </a>
+                </li>
+                <li class="soc-nav-item">
+                    <a href="{{ url_for('trends_page') }}" class="soc-nav-link {% if request.path == url_for('trends_page') %}active{% endif %}">
+                        <i class="fas fa-chart-line"></i> Behavior & Drift
+                    </a>
+                </li>
+                <li class="soc-nav-item">
+                    <a href="{{ url_for('remediation') }}" class="soc-nav-link {% if request.path == url_for('remediation') %}active{% endif %}">
+                        <i class="fas fa-lock"></i> Containment
+                    </a>
+                </li>
+                <li class="soc-nav-item">
+                    <a href="{{ url_for('reports') }}" class="soc-nav-link {% if request.path == url_for('reports') %}active{% endif %}">
+                        <i class="fas fa-file-shield"></i> Reports
+                    </a>
+                </li>
+                <li class="soc-nav-item">
+                    <a href="{{ url_for('network_scan_page') }}" class="soc-nav-link {% if request.path == url_for('network_scan_page') %}active{% endif %}">
+                        <i class="fas fa-satellite-dish"></i> Discovery Probe
+                    </a>
+                </li>
+                <li class="soc-nav-item">
+                    <a href="{{ url_for('security_tips') }}" class="soc-nav-link {% if request.path == url_for('security_tips') %}active{% endif %}">
+                        <i class="fas fa-sliders"></i> Compliance Audit
+                    </a>
+                </li>
+                <li class="soc-nav-item">
+                    <a href="{{ url_for('api_docs') }}" class="soc-nav-link {% if request.path == url_for('api_docs') %}active{% endif %}">
+                        <i class="fas fa-code"></i> API & Integrations
+                    </a>
+                </li>
+            </ul>
+            
+            <div class="soc-sidebar-footer">
+                <div class="d-flex align-items-center justify-content-between mb-2">
+                    <span>Engine Version</span>
+                    <span class="font-mono text-white">v4.0-SOC</span>
+                </div>
+                <div class="d-flex align-items-center justify-content-between">
+                    <span>Telemetry Status</span>
+                    <span class="soc-badge soc-badge-verified">● LIVE</span>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Content Area -->
+        <div class="soc-main-content">
+            <!-- Top Operational Context Bar -->
+            <header class="soc-topbar">
+                <div class="soc-context-group">
+                    <span class="soc-badge soc-badge-accent">● PILOT ENVIRONMENT</span>
+                    <div class="soc-context-item">
+                        <i class="fas fa-building text-muted"></i>
+                        <span>Tenant: <strong>{{ current_user.username|title }} Enterprise</strong></span>
+                    </div>
+                    <div class="soc-context-item d-none d-md-flex">
+                        <i class="fas fa-network-wired text-muted"></i>
+                        <span>Site: <strong>HQ Alpha (192.168.1.0/24)</strong></span>
+                    </div>
+                </div>
                 
-                // Save theme preference using fetch to avoid page reload
-                fetch('/toggle-theme', { method: 'POST' })
-                    .then(() => {
-                        // Update theme
-                        document.documentElement.setAttribute('data-theme', newTheme);
-                        localStorage.setItem('theme', newTheme);
-                        
-                        // Update icon
-                        const icon = themeToggle.querySelector('i');
-                        if (icon) {
-                            icon.classList.remove('fa-sun', 'fa-moon');
-                            icon.classList.add(newTheme === 'dark' ? 'fa-sun' : 'fa-moon');
-                        }
-                        
-                        // Update nav link text if it exists
-                        if (themeToggleLink) {
-                            const linkIcon = themeToggleLink.querySelector('i');
-                            if (linkIcon) {
-                                linkIcon.classList.remove('fa-sun', 'fa-moon');
-                                linkIcon.classList.add(newTheme === 'dark' ? 'fa-sun' : 'fa-moon');
-                            }
-                            
-                            themeToggleLink.innerHTML = linkIcon.outerHTML + (newTheme === 'dark' ? ' Light Mode' : ' Dark Mode');
-                        }
-                        
-                        // Update charts if updateDashboardTheme function exists
-                        if (typeof updateDashboardTheme === 'function') {
-                            updateDashboardTheme(newTheme);
-                        }
-                    });
-            });
-        }
-        
-        // Apply saved theme
-        const savedTheme = localStorage.getItem('theme');
-        if (savedTheme && savedTheme !== document.documentElement.getAttribute('data-theme')) {
-            document.documentElement.setAttribute('data-theme', savedTheme);
-        }
-        
-        // Add copy functionality to API keys
-        document.querySelectorAll('.copy-btn').forEach(btn => {
-            btn.addEventListener('click', function() {
-                const textToCopy = this.parentElement.querySelector('.api-key').textContent;
-                navigator.clipboard.writeText(textToCopy)
-                    .then(() => {
-                        // Show copied feedback
-                        const originalText = this.textContent;
-                        this.textContent = 'Copied!';
-                        setTimeout(() => {
-                            this.textContent = originalText;
-                        }, 2000);
-                    });
-            });
-        });
-    });
-    </script>
+                <div class="soc-topbar-actions">
+                    <a href="{{ url_for('alerts') }}" class="soc-btn soc-btn-secondary" style="padding: 4px 10px; font-size: 12px;">
+                        <i class="fas fa-bell text-danger"></i>
+                        <span>Alerts</span>
+                    </a>
+                    
+                    <div class="dropdown">
+                        <button class="soc-btn soc-btn-secondary dropdown-toggle" type="button" id="userMenu" data-bs-toggle="dropdown" aria-expanded="false" style="padding: 4px 12px; font-size: 12px;">
+                            <i class="fas fa-user-shield text-info me-1"></i> {{ current_user.username }}
+                        </button>
+                        <ul class="dropdown-menu dropdown-menu-end dropdown-menu-dark" aria-labelledby="userMenu" style="background-color: var(--soc-surface-secondary); border-color: var(--soc-border);">
+                            <li><a class="dropdown-item" href="{{ url_for('profile') }}"><i class="fas fa-id-badge me-2"></i>Operator Profile</a></li>
+                            <li><a class="dropdown-item" href="{{ url_for('api_docs') }}"><i class="fas fa-key me-2"></i>Sensor API Tokens</a></li>
+                            <li><hr class="dropdown-divider" style="border-color: var(--soc-border);"></li>
+                            <li><a class="dropdown-item text-danger" href="{{ url_for('logout') }}"><i class="fas fa-sign-out-alt me-2"></i>Sign Out</a></li>
+                        </ul>
+                    </div>
+                </div>
+            </header>
+
+            <!-- Flash Alert Messages -->
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                <div class="px-4 pt-3">
+                    {% for category, message in messages %}
+                    <div class="soc-alert-item {% if category == 'danger' or category == 'error' %}critical{% elif category == 'warning' %}high{% else %}medium{% endif %}">
+                        <div>
+                            <i class="fas fa-info-circle me-2"></i> {{ message }}
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% endif %}
+            {% endwith %}
+
+            <!-- Main Canvas -->
+            <main class="soc-canvas">
+                {% block content %}{% endblock %}
+            </main>
+        </div>
+    </div>
+    {% else %}
+    <!-- Unauthenticated Layout (Landing / Login / Register) -->
+    <header class="soc-topbar">
+        <div class="soc-context-group">
+            <a href="{{ url_for('index') }}" class="soc-brand" style="border: none;">
+                <i class="fas fa-shield-alt soc-brand-icon"></i>
+                <span>PrivIoT <span style="color: var(--soc-accent); font-weight: 800;">SHIELD</span></span>
+            </a>
+            <span class="soc-badge soc-badge-accent d-none d-md-inline-block">● ENTERPRISE PILOT</span>
+        </div>
+        <div class="soc-topbar-actions">
+            <a href="{{ url_for('login') }}" class="soc-btn soc-btn-primary" style="padding: 5px 14px; font-size: 13px;">
+                <i class="fas fa-sign-in-alt me-1"></i> Operator Login
+            </a>
+        </div>
+    </header>
+
+    <!-- Flash Alert Messages for Anonymous Users -->
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+        <div class="container pt-3">
+            {% for category, message in messages %}
+            <div class="soc-alert-item {% if category == 'danger' or category == 'error' %}critical{% elif category == 'warning' %}high{% else %}medium{% endif %}">
+                <div>
+                    <i class="fas fa-info-circle me-2"></i> {{ message }}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+    {% endwith %}
+
+    <main class="py-5" style="background-color: var(--soc-bg); min-height: calc(100vh - var(--topbar-height));">
+        {% block unauth_content %}{% endblock %}
+    </main>
+    {% endif %}
+
+    <!-- Bootstrap 5 JS Bundle -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/js/bootstrap.bundle.min.js"></script>
+    {% block scripts %}{% endblock %}
 </body>
 </html>

@@ -12,7 +12,14 @@ logger = logging.getLogger(__name__)
 # The newest OpenAI model is "gpt-4o" which was released May 13, 2024.
 # do not change this unless explicitly requested by the user
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
-openai = OpenAI(api_key=OPENAI_API_KEY)
+if OPENAI_API_KEY:
+    try:
+        openai = OpenAI(api_key=OPENAI_API_KEY)
+    except Exception as e:
+        logger.error(f"Failed to initialize OpenAI client in report_generator: {str(e)}")
+        openai = None
+else:
+    openai = None
 
 
 def generate_report(scan, report_type):
