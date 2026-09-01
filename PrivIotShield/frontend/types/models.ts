@@ -11,6 +11,8 @@ export interface Asset {
   device_type: string;
   firmware_version: string | null;
   identity_confidence: number;
+  discovery_source?: string;
+  reconciliation_method?: string;
   network_scope: string;
   is_managed: boolean;
   current_pri_score: number;
@@ -19,6 +21,13 @@ export interface Asset {
   active_containment_state: string;
   first_seen: string | null;
   last_seen: string | null;
+  rssi?: number | null;
+  channel?: number | null;
+  observation_count?: number;
+  proximity_zone?: string;
+  maturity_stage?: "PRELIMINARY" | "DEVELOPING" | "ESTABLISHED" | "MATURE";
+  maturity_confidence?: number;
+  evidence_window?: string;
 }
 
 export interface DeviceTrustProfile {

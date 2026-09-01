@@ -150,5 +150,74 @@ export const api = {
 
   // System Observability
   getSystemHealth: () => fetchJson<{ health: any }>("/system/health"),
-  getSystemMetrics: () => fetchJson<any>("/system/metrics")
+  getSystemMetrics: () => fetchJson<any>("/system/metrics"),
+
+  // Behavior Stats & Signal History
+  getBehaviorStats: () => fetchJson<{
+    total_real_observations: number;
+    total_assets_monitored: number;
+    observation_window_minutes: number;
+    observation_window_formatted: string;
+    earliest_observation: string | null;
+    latest_observation: string | null;
+    maturity_distribution: Record<string, number>;
+    open_drifts_count: number;
+    profile_type: string;
+    safe_flows_status: string;
+  }>("/behavior/stats"),
+  getSignalHistory: (assetId: number, limit = 50) =>
+    fetchJson<{
+      asset_id: number;
+      mac_address: string;
+      total_points: number;
+      history: Array<{
+        timestamp: string;
+        rssi: number | null;
+        channel: number | null;
+        ssid: string | null;
+        encryption_type: number | null;
+      }>;
+    }>(`/assets/${assetId}/signal-history?limit=${limit}`),
+
+  // PRIVIOT RIM (Radio Intelligence & Movement)
+  getRadioFingerprint: (assetId: number) =>
+    fetchJson<{
+      asset_id: number;
+      bssid: string;
+      ssid: string;
+      fingerprint: Record<string, any>;
+      similarity: Record<string, any>;
+      trajectory: Record<string, any>;
+      maturity_stage: string;
+      maturity_confidence: number;
+      evidence_window: string;
+    }>(`/assets/${assetId}/radio-fingerprint`),
+
+  getProximity: (assetId: number) =>
+    fetchJson<{
+      asset_id: number;
+      bssid: string;
+      proximity_score: number;
+      proximity_state: string;
+      rssi_ema: number;
+      rssi_current: number | null;
+      rssi_mean: number | null;
+      confidence: number;
+      scale: string;
+      interpretation: string;
+    }>(`/assets/${assetId}/proximity`),
+
+  getMovement: (assetId: number) =>
+    fetchJson<{
+      asset_id: number;
+      bssid: string;
+      movement_state: string;
+      trend: string;
+      slope_db_per_sec: number;
+      directional_consistency: number;
+      window_points: number;
+      confidence: number;
+      description: string;
+    }>(`/assets/${assetId}/movement`)
 };
+

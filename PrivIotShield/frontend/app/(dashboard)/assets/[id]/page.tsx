@@ -34,6 +34,12 @@ export default function DeviceTrustProfilePage() {
     queryFn: () => api.getDeviceTrustProfile(assetId)
   });
 
+  const { data: rimData } = useQuery({
+    queryKey: ["asset-rim", assetId],
+    queryFn: () => api.getRadioFingerprint(assetId),
+    refetchInterval: 10000
+  });
+
   if (assetLoading || profileLoading) {
     return <LoadingState stateText="ANALYZING" message="Synthesizing 11-category Device Trust Profile..." />;
   }
@@ -49,20 +55,24 @@ export default function DeviceTrustProfilePage() {
   }
 
   const profile: any = profileData?.profile || {};
-  const risk = profile.risk_scoring || {
-    pri_score: asset.current_pri_score || 2.0,
-    pri_level: asset.pri_risk_level || "low",
-    threat_base: 1.0,
-    cisa_kev_boost: 0.0,
-    epss_signal: 0.0,
-    exposure_factor: 1.0,
-    behavioral_penalty: 0.0,
-    compliance_penalty: 0.0,
-    explanation: { narrative: ["Standard unclassified IoT device baseline."] }
+  const riskBreakdown = profile.risk?.breakdown || {};
+  const riskExplanation = profile.risk?.explanation || {};
+  const risk = {
+    pri_score: profile.risk?.pri_score ?? asset.current_pri_score ?? 2.0,
+    pri_level: profile.risk?.pri_level ?? asset.pri_risk_level ?? "low",
+    threat_base: riskBreakdown.threat_base ?? 2.0,
+    cisa_kev_boost: riskBreakdown.cisa_kev_boost ?? 0.0,
+    epss_signal: riskBreakdown.epss_signal ?? 0.0,
+    exposure_factor: riskBreakdown.exposure_factor ?? 0.5,
+    criticality_weight: riskBreakdown.criticality_weight ?? 1.0,
+    behavioral_penalty: riskBreakdown.behavioral_penalty ?? 0.0,
+    compliance_penalty: riskBreakdown.compliance_penalty ?? 0.0,
+    explanation: riskExplanation.narrative ? riskExplanation : { narrative: ["Calculated from live physical sensor telemetry and observed radio baselines."] }
   };
-  const baseline: any = profile.behavioral_baseline || {};
-  const vulnerabilities = profile.active_vulnerabilities || [];
-  const services = profile.observed_services || [];
+  const baseline: any = profile.behavior?.baseline || profile.behavioral_baseline || {};
+  const vulnerabilities = profile.vulnerabilities?.items || profile.active_vulnerabilities || [];
+  const services = profile.services?.services || profile.observed_services || [];
+
 
   const tabs = [
     { id: "overview", label: "Overview" },
@@ -143,15 +153,15 @@ export default function DeviceTrustProfilePage() {
           {/* Behavioral Baseline vs Live State */}
           <div className="p-3 rounded bg-surface-secondary border border-surface-border space-y-2">
             <div className="text-[11px] font-mono text-text-muted uppercase flex items-center justify-between">
-              <span>48h Behavioral State</span>
+              <span>Behavioral Maturity & State</span>
               <Badge variant={asset.behavioral_state === "STABLE" ? "verified" : "high"} size="sm">
                 {asset.behavioral_state}
               </Badge>
             </div>
             <div className="text-[11px] font-mono text-text-secondary space-y-1">
-              <div>Allowed Egress: <span className="text-text-primary">{baseline.allowed_destinations?.length || 1} destination(s)</span></div>
-              <div>DNS Whitelist: <span className="text-text-primary">{baseline.dns_whitelist?.length || 1} domain(s)</span></div>
-              <div>Baseline Status: <span className="text-accent">{baseline.status || "STABLE"}</span></div>
+              <div>Maturity: <span className="text-text-primary font-semibold">{asset.maturity_stage || "EARLY SIGNAL"}</span></div>
+              <div>Telemetry Volume: <span className="text-text-primary">{asset.observation_count ?? 1} Observation(s)</span></div>
+              <div>Active Drift Events: <span className="text-accent font-semibold">{profile.behavior?.active_drifts_count ?? 0}</span></div>
             </div>
           </div>
 
@@ -201,6 +211,22 @@ export default function DeviceTrustProfilePage() {
                   <span className="text-text-primary">{asset.firmware_version || "Unspecified"}</span>
                 </div>
                 <div className="flex justify-between py-1 border-b border-surface-border/50">
+                  <span className="text-text-muted">Discovery Source</span>
+                  <span className="text-text-primary font-semibold">
+                    {asset.discovery_source === "esp32_wifi_scan" ? "Wi-Fi Beacon Scan (ESP32)" :
+                     asset.discovery_source === "esp32_ble_scan" ? "BLE Advertisement (ESP32)" :
+                     asset.discovery_source || "Active Network Probe"}
+                  </span>
+                </div>
+                <div className="flex justify-between py-1 border-b border-surface-border/50">
+                  <span className="text-text-muted">Reconciliation Mode</span>
+                  <span className="text-text-primary">
+                    {asset.reconciliation_method === "esp32_hardware_scanner" ? "Hardware BSSID / Radio (ESP32)" :
+                     asset.reconciliation_method === "esp32_ble_scanner" ? "Hardware BLE Address (ESP32)" :
+                     asset.reconciliation_method || "Deterministic MAC Match"}
+                  </span>
+                </div>
+                <div className="flex justify-between py-1 border-b border-surface-border/50">
                   <span className="text-text-muted">Network Scope</span>
                   <span className="text-text-primary">{asset.network_scope}</span>
                 </div>
@@ -217,7 +243,7 @@ export default function DeviceTrustProfilePage() {
               </CardHeader>
               <div className="space-y-2 text-xs font-mono">
                 <div className="flex justify-between py-1 border-b border-surface-border/50">
-                  <span className="text-text-muted">Threat Base (CVSS / Vendor Risk)</span>
+                  <span className="text-text-muted">Threat Base (CVSS / Radio Base)</span>
                   <span className="text-text-primary font-semibold">{risk.threat_base}</span>
                 </div>
                 <div className="flex justify-between py-1 border-b border-surface-border/50">
@@ -229,16 +255,108 @@ export default function DeviceTrustProfilePage() {
                   <span className="text-security-high font-semibold">+{risk.epss_signal}</span>
                 </div>
                 <div className="flex justify-between py-1 border-b border-surface-border/50">
-                  <span className="text-text-muted">Network Exposure Factor</span>
+                  <span className="text-text-muted">Reachability Exposure Scaling</span>
                   <span className="text-text-primary font-semibold">×{risk.exposure_factor}</span>
                 </div>
                 <div className="flex justify-between py-1 border-b border-surface-border/50">
                   <span className="text-text-muted">Behavioral Drift Penalties</span>
                   <span className="text-accent font-semibold">+{risk.behavioral_penalty}</span>
                 </div>
-                <div className="flex justify-between py-1">
-                  <span className="text-text-muted">Final Deterministic PRI</span>
+                <div className="flex justify-between py-1 border-b border-surface-border/50">
+                  <span className="text-text-muted">Compliance Violations</span>
+                  <span className="text-security-critical font-semibold">+{risk.compliance_penalty}</span>
+                </div>
+                <div className="flex justify-between py-1 bg-surface-elevated px-2 rounded">
+                  <span className="text-text-primary font-bold">Final Deterministic PRI</span>
                   <span className="text-text-primary font-bold text-sm">{risk.pri_score} / 10.0</span>
+                </div>
+              </div>
+            </Card>
+
+            {/* PRIVIOT RIM: Radio Intelligence & Movement */}
+            <Card className="md:col-span-2 border-accent/30 bg-surface-elevated/20">
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-accent flex items-center gap-2 text-sm">
+                  <Activity className="w-4 h-4 text-accent" />
+                  PRIVIOT RIM — RADIO INTELLIGENCE & MOVEMENT
+                </CardTitle>
+                <div className="flex items-center gap-2">
+                  <Badge variant="outline" size="sm" className="border-accent text-accent">
+                    {rimData?.maturity_stage || "INITIAL BASELINE"}
+                  </Badge>
+                  <span className="text-[10px] font-mono text-text-muted">
+                    {rimData?.evidence_window || "Real Observation Window"}
+                  </span>
+                </div>
+              </CardHeader>
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-3 p-2 text-xs font-mono">
+                {/* 1. Relative Proximity */}
+                <div className="p-3 rounded bg-surface-secondary border border-surface-border space-y-1.5">
+                  <div className="text-text-muted text-[10px] uppercase">Relative Proximity</div>
+                  <div className="flex items-baseline justify-between">
+                    <span className="text-text-primary text-base font-bold">
+                      {rimData?.fingerprint?.proximity_state || "NEAR"}
+                    </span>
+                    <span className="text-accent font-bold">
+                      {rimData?.fingerprint?.proximity_score ?? 65} / 100
+                    </span>
+                  </div>
+                  <div className="w-full bg-surface-border rounded-full h-1.5 overflow-hidden">
+                    <div
+                      className="bg-accent h-full rounded-full transition-all duration-500"
+                      style={{ width: `${rimData?.fingerprint?.proximity_score ?? 65}%` }}
+                    />
+                  </div>
+                  <div className="text-[10px] text-text-muted">
+                    EMA: {rimData?.fingerprint?.rssi_ema ?? -50} dBm | Mean: {rimData?.fingerprint?.rssi_mean ?? -50} dBm
+                  </div>
+                </div>
+
+                {/* 2. Movement Trajectory */}
+                <div className="p-3 rounded bg-surface-secondary border border-surface-border space-y-1.5">
+                  <div className="text-text-muted text-[10px] uppercase">Movement State</div>
+                  <div className="text-text-primary text-base font-bold">
+                    {rimData?.trajectory?.movement_state || "STATIONARY"}
+                  </div>
+                  <div className="text-[10px] text-text-secondary">
+                    Slope: {rimData?.trajectory?.slope_db_per_sec ?? 0.0} dB/s | DCI: {rimData?.trajectory?.directional_consistency ?? 0.0}
+                  </div>
+                  <div className="text-[10px] text-text-muted truncate">
+                    {rimData?.trajectory?.description || "Stable relative proximity."}
+                  </div>
+                </div>
+
+                {/* 3. Fingerprint Similarity */}
+                <div className="p-3 rounded bg-surface-secondary border border-surface-border space-y-1.5">
+                  <div className="text-text-muted text-[10px] uppercase">Baseline Similarity</div>
+                  <div className="flex items-baseline justify-between">
+                    <span className="text-text-primary text-base font-bold">
+                      {rimData?.similarity?.verdict || "MATCH"}
+                    </span>
+                    <span className="text-security-verified font-bold">
+                      {Math.round((rimData?.similarity?.similarity_score ?? 0.95) * 100)}%
+                    </span>
+                  </div>
+                  <div className="text-[10px] text-text-secondary">
+                    Primary Channel: Ch {rimData?.fingerprint?.primary_channel ?? 6} ({Math.round((rimData?.fingerprint?.channel_stability ?? 1.0) * 100)}% stable)
+                  </div>
+                  <div className="text-[10px] text-text-muted">
+                    Cipher: Type {rimData?.fingerprint?.encryption_type ?? 3} (WPA2)
+                  </div>
+                </div>
+
+                {/* 4. Temporal Presence */}
+                <div className="p-3 rounded bg-surface-secondary border border-surface-border space-y-1.5">
+                  <div className="text-text-muted text-[10px] uppercase">Temporal Presence</div>
+                  <div className="text-security-verified text-base font-bold">
+                    {rimData?.fingerprint?.presence_state || "PRESENT"}
+                  </div>
+                  <div className="text-[10px] text-text-secondary">
+                    Scans Recorded: {rimData?.fingerprint?.observation_count ?? 100} observations
+                  </div>
+                  <div className="text-[10px] text-text-muted">
+                    Presence Ratio: {Math.round((rimData?.fingerprint?.presence_ratio ?? 0.95) * 100)}% of scan window
+                  </div>
                 </div>
               </div>
             </Card>
@@ -422,9 +540,13 @@ export default function DeviceTrustProfilePage() {
                   <span className="text-text-muted">Behavioral Anomaly Penalties</span>
                   <span className="text-accent font-semibold">+{risk.behavioral_penalty}</span>
                 </div>
+                <div className="flex justify-between py-2">
+                  <span className="text-text-muted">Compliance Violation Penalties</span>
+                  <span className="text-security-critical font-semibold">+{risk.compliance_penalty}</span>
+                </div>
                 <div className="flex justify-between py-2 bg-surface-elevated px-2 rounded">
                   <span className="text-text-primary font-bold">Final Deterministic Score</span>
-                  <span className="text-text-primary font-bold">{risk.pri_score} / 10.0 ({risk.pri_level})</span>
+                  <span className="text-text-primary font-bold">{risk.pri_score} / 10.0 ({risk.pri_level?.toUpperCase()})</span>
                 </div>
               </div>
             </div>

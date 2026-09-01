@@ -64,17 +64,56 @@ class FingerprintPipeline:
         if mac and len(mac) >= 8:
             prefix = mac[:8].upper()
             oui_map = {
+                # Surveillance & Smart Cameras
                 "00:12:17": ("Hikvision", "IP Camera"),
-                "50:C7:BF": ("TP-Link", "Smart Plug"),
-                "CC:6E:A4": ("Samsung", "Smart TV"),
-                "00:1E:0B": ("HP", "Printer"),
                 "00:40:8C": ("Axis Communications", "Access Controller"),
+                "E0:50:8B": ("Dahua", "IP Camera"),
+                # IoT & Smart Home
+                "50:C7:BF": ("TP-Link", "Smart Plug / IoT"),
+                "14:EB:B6": ("TP-Link", "Wi-Fi Router / AP"),
+                "E8:48:B8": ("TP-Link", "Smart Device"),
+                "B0:4E:26": ("TP-Link", "Wireless Device"),
                 "EC:B5:FA": ("Philips Hue", "IoT Gateway"),
-                "74:83:C2": ("Ubiquiti", "Wireless AP"),
-                "F0:18:98": ("Apple", "Host (macOS)"),
-                "3C:28:6D": ("Google", "Android Device"),
+                "50:02:91": ("Tuya Smart", "Smart IoT Device"),
+                "70:89:76": ("Tuya Smart", "Smart Home Sensor"),
+                "D4:A6:51": ("Tuya Smart", "Smart Controller"),
+                # Espressif Modules (ESP32 / ESP8266)
+                "24:0A:C4": ("Espressif", "ESP32 IoT Node"),
+                "30:AE:A4": ("Espressif", "ESP32 IoT Node"),
+                "84:CC:A8": ("Espressif", "ESP8266 IoT Node"),
+                "94:E6:86": ("Espressif", "ESP32 IoT Node"),
+                "A0:B7:65": ("Espressif", "ESP32 Dev Module"),
+                "AC:67:B2": ("Espressif", "ESP32 Device"),
+                "C4:4F:33": ("Espressif", "ESP8266 Device"),
+                "DC:4F:22": ("Espressif", "ESP32 Device"),
+                "EC:62:60": ("Espressif", "ESP8266 Device"),
+                "30:C6:F7": ("Espressif", "ESP32 Device"),
+                # Networking & Infrastructure
+                "00:14:22": ("Cisco", "Network Infrastructure"),
+                "00:1A:A1": ("Cisco", "Wireless Controller"),
+                "00:22:6B": ("Cisco-Linksys", "Wi-Fi Router"),
+                "00:14:6C": ("Netgear", "Wi-Fi Router"),
+                "00:1E:2A": ("Netgear", "Wireless Gateway"),
+                "20:4E:7F": ("Netgear", "Wireless AP"),
+                "74:83:C2": ("Ubiquiti", "UniFi Wireless AP"),
+                "00:18:0A": ("Ubiquiti", "UniFi AP / Switch"),
+                "FC:EC:DA": ("Ubiquiti", "UniFi Gateway"),
+                "00:05:5D": ("D-Link", "Wireless Router"),
+                "18:62:2C": ("D-Link", "Access Point"),
                 "00:11:32": ("Synology", "Network Storage"),
-                "94:E6:86": ("Espressif", "Generic IoT Device")
+                # Consumer & Mobile Ecosystems
+                "F0:18:98": ("Apple", "Apple Host / Device"),
+                "3C:06:30": ("Apple", "Apple Device"),
+                "60:F8:1D": ("Apple", "Apple Device"),
+                "3C:28:6D": ("Google", "Nest / Android Device"),
+                "54:60:09": ("Google", "Google Home / Chromecast"),
+                "CC:6E:A4": ("Samsung", "Smart Appliance"),
+                "00:07:AB": ("Samsung", "Smart TV"),
+                "00:1E:0B": ("HP", "Network Printer"),
+                "00:26:86": ("Amazon", "Echo / Alexa Device"),
+                "84:D6:D0": ("Amazon", "FireTV / Echo Device"),
+                "00:1A:79": ("Intel", "Wi-Fi Interface"),
+                "70:4F:57": ("Intel", "Wireless Controller")
             }
             if prefix in oui_map:
                 v, t = oui_map[prefix]
@@ -82,11 +121,45 @@ class FingerprintPipeline:
                 inferred_type = t
                 claims.append(IdentityEvidenceClaim(
                     source="mac_oui_database",
-                    observation=f"MAC OUI '{prefix}' registered to {v}",
+                    observation=f"MAC OUI '{prefix}' registered to {v} ({t})",
                     weight=0.35,
                     confidence_contrib=0.35
                 ))
                 seen_sources.add("mac_oui")
+
+        # 0.1 Wi-Fi Beacon & Scan Signal
+        ssid = obs.get("ssid")
+        bssid = obs.get("bssid")
+        rssi = obs.get("rssi")
+        channel = obs.get("channel")
+        if ssid or bssid:
+            if inferred_type == "Generic IoT Device":
+                inferred_type = "Wi-Fi Access Point / Router"
+            if ssid and ssid != "<hidden>":
+                inferred_model = f"SSID: {ssid}"
+            claims.append(IdentityEvidenceClaim(
+                source="esp32_wifi_beacon",
+                observation=f"Wi-Fi SSID: '{ssid or 'Hidden'}', BSSID: {bssid or mac}, RSSI: {rssi or 'N/A'} dBm, Channel: {channel or 'N/A'}",
+                weight=0.30,
+                confidence_contrib=0.25
+            ))
+            seen_sources.add("wifi_scan")
+
+        # 0.2 BLE Advertisement Signal
+        ble_name = obs.get("name") or obs.get("ble_name")
+        ble_addr = obs.get("address") or obs.get("ble_address")
+        if ble_name or (obs.get("observation_type") == "ble_scan"):
+            if inferred_type == "Generic IoT Device":
+                inferred_type = "BLE Peripheral / Beacon"
+            if ble_name:
+                inferred_model = f"BLE: {ble_name}"
+            claims.append(IdentityEvidenceClaim(
+                source="esp32_ble_advertisement",
+                observation=f"BLE Name: '{ble_name or 'Unnamed'}', Address: {ble_addr or mac}, RSSI: {rssi or 'N/A'} dBm",
+                weight=0.30,
+                confidence_contrib=0.25
+            ))
+            seen_sources.add("ble_scan")
 
         # 1. UPnP Device Descriptor (Independent Structured Protocol: Weight 0.35)
         if upnp:

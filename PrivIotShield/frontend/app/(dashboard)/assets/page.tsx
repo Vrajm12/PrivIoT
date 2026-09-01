@@ -4,7 +4,7 @@ import React, { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
-import { Server, Filter, Search, ShieldAlert, Zap } from "lucide-react";
+import { Server, Filter, Search, ShieldAlert, Zap, FileSpreadsheet, Download } from "lucide-react";
 import { api } from "@/lib/api-client";
 import { Asset } from "@/types/models";
 import { Card } from "@/components/ui/Card";
@@ -16,6 +16,7 @@ import { DataTable } from "@/components/ui/DataTable";
 import { LoadingState } from "@/components/ui/LoadingState";
 import { ErrorState } from "@/components/ui/ErrorState";
 import { formatDate } from "@/lib/utils";
+import { exportAssetsToExcelCsv } from "@/lib/export-utils";
 
 export default function AssetsPage() {
   const router = useRouter();
@@ -32,30 +33,47 @@ export default function AssetsPage() {
   const columns = [
     {
       header: "DEVICE / VENDOR",
-      cell: (item: Asset) => (
-        <div>
-          <div className="font-semibold text-text-primary flex items-center gap-1.5">
-            {item.vendor} {item.model}
-            {item.first_seen && new Date(item.first_seen).getTime() > Date.now() - 24 * 3600 * 1000 && (
-              <Badge variant="accent" size="sm">NEW</Badge>
-            )}
+      cell: (item: Asset) => {
+        const isEsp32 = item.discovery_source === "esp32_wifi_scan" || item.discovery_source === "esp32_ble_scan" || item.reconciliation_method === "esp32_hardware_scanner" || item.reconciliation_method === "esp32_ble_scanner";
+        return (
+          <div>
+            <div className="font-semibold text-text-primary flex items-center gap-1.5">
+              {item.vendor} {item.model}
+              {isEsp32 && (
+                <span className="px-1.5 py-0.5 rounded bg-security-verified/15 text-security-verified border border-security-verified/40 text-[9px] font-mono font-bold">
+                  REAL SENSOR
+                </span>
+              )}
+              {item.first_seen && new Date(item.first_seen).getTime() > Date.now() - 24 * 3600 * 1000 && (
+                <Badge variant="accent" size="sm">NEW</Badge>
+              )}
+            </div>
+            <div className="text-[10px] text-text-muted font-mono flex items-center gap-1.5">
+              <span>{item.device_type}</span>
+              {item.hostname && item.hostname !== "Unknown" && (
+                <span className="text-accent font-semibold">({item.hostname})</span>
+              )}
+            </div>
           </div>
-          <div className="text-[10px] text-text-muted font-mono">{item.device_type}</div>
-        </div>
-      )
+        );
+      }
     },
     {
       header: "IP ADDRESS",
       cell: (item: Asset) => (
-        <span className="font-mono text-text-primary font-medium">{item.ip_address}</span>
+        <span className="font-mono text-text-primary font-medium">
+          {item.ip_address === "0.0.0.0" ? <span className="text-text-muted">Unassigned (L2/Radio)</span> : item.ip_address}
+        </span>
       )
     },
     {
-      header: "MAC / SCOPE",
+      header: "MAC / BSSID",
       cell: (item: Asset) => (
         <div className="font-mono text-[11px] text-text-secondary">
-          <div>{item.mac_address}</div>
-          <div className="text-[10px] text-text-muted">{item.network_scope}</div>
+          <div className="font-bold text-text-primary">{item.mac_address}</div>
+          <div className="text-[10px] text-text-muted">
+            {item.discovery_source === "esp32_wifi_scan" ? "Wi-Fi Scan (ESP32)" : item.discovery_source === "esp32_ble_scan" ? "BLE Scan (ESP32)" : item.network_scope}
+          </div>
         </div>
       )
     },
@@ -103,6 +121,21 @@ export default function AssetsPage() {
       )
     },
     {
+      header: "RADIO / SIGNAL",
+      cell: (item: Asset) => (
+        <div className="font-mono text-[11px]">
+          {item.rssi !== undefined && item.rssi !== null ? (
+            <>
+              <div className="text-text-primary font-bold">{item.rssi} dBm</div>
+              <div className="text-[10px] text-text-muted">Ch {item.channel ?? 1} • {item.observation_count ?? 1} Obs</div>
+            </>
+          ) : (
+            <span className="text-text-muted">N/A</span>
+          )}
+        </div>
+      )
+    },
+    {
       header: "LAST SEEN",
       cell: (item: Asset) => (
         <span className="font-mono text-[11px] text-text-muted">{formatDate(item.last_seen)}</span>
@@ -110,10 +143,11 @@ export default function AssetsPage() {
     }
   ];
 
+
   return (
     <div className="space-y-4">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-lg font-bold font-mono text-text-primary tracking-wide flex items-center gap-2">
             <Server className="w-5 h-5 text-accent" />
@@ -122,6 +156,18 @@ export default function AssetsPage() {
           <p className="text-xs text-text-secondary">
             Continuous passive discovery, cryptographic fingerprinting and real-time posture index.
           </p>
+        </div>
+
+        <div>
+          <Button
+            variant="primary"
+            size="sm"
+            onClick={() => exportAssetsToExcelCsv(assets)}
+            disabled={assets.length === 0}
+            className="flex items-center gap-1.5 font-mono text-xs font-bold"
+          >
+            <Download className="w-3.5 h-3.5 mr-1" /> Export Excel (CSV)
+          </Button>
         </div>
       </div>
 
@@ -171,7 +217,7 @@ export default function AssetsPage() {
           columns={columns}
           data={assets}
           onRowClick={(asset) => router.push(`/assets/${asset.id}`)}
-          emptyMessage="No devices matching active search criteria."
+          emptyMessage="NO REAL ASSETS DISCOVERED — Start the ESP32 scanner to begin discovery."
         />
       )}
     </div>

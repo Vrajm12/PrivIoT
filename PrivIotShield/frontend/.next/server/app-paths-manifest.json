@@ -1,17 +1,8 @@
 {
-  "/(auth)/login/page": "app/(auth)/login/page.js",
-  "/(dashboard)/collectors/page": "app/(dashboard)/collectors/page.js",
-  "/(dashboard)/dashboard/page": "app/(dashboard)/dashboard/page.js",
-  "/(dashboard)/assets/page": "app/(dashboard)/assets/page.js",
-  "/(dashboard)/onboarding/page": "app/(dashboard)/onboarding/page.js",
-  "/(dashboard)/system/page": "app/(dashboard)/system/page.js",
-  "/(dashboard)/reports/page": "app/(dashboard)/reports/page.js",
-  "/(dashboard)/fleet/page": "app/(dashboard)/fleet/page.js",
   "/(dashboard)/assets/[id]/page": "app/(dashboard)/assets/[id]/page.js",
+  "/(dashboard)/assets/page": "app/(dashboard)/assets/page.js",
   "/(dashboard)/alerts/page": "app/(dashboard)/alerts/page.js",
   "/(dashboard)/behavior/page": "app/(dashboard)/behavior/page.js",
-  "/(dashboard)/exposure/page": "app/(dashboard)/exposure/page.js",
-  "/(dashboard)/sites/page": "app/(dashboard)/sites/page.js",
-  "/(dashboard)/pilot/page": "app/(dashboard)/pilot/page.js",
-  "/(dashboard)/audit/page": "app/(dashboard)/audit/page.js"
+  "/(dashboard)/dashboard/page": "app/(dashboard)/dashboard/page.js",
+  "/(dashboard)/vulnerabilities/page": "app/(dashboard)/vulnerabilities/page.js"
 }

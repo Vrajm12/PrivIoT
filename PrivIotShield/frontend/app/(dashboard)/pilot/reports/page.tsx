@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import React, { useState } from "react";
 import Link from "next/link";
@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/Button";
 import { RiskScore } from "@/components/ui/RiskScore";
 import { LoadingState } from "@/components/ui/LoadingState";
 import { formatDate } from "@/lib/utils";
+import { exportPilotEvidenceToExcelCsv } from "@/lib/export-utils";
 
 export default function PilotReportPage() {
   const { data: assetsData, isLoading: assetsLoading } = useQuery({
@@ -58,8 +59,13 @@ export default function PilotReportPage() {
           <Button variant="secondary" size="sm" onClick={() => window.print()}>
             <Printer className="w-3.5 h-3.5 mr-1" /> Print Report
           </Button>
-          <Button variant="primary" size="sm" onClick={() => alert("Pilot evaluation exported to PDF.")}>
-            <Download className="w-3.5 h-3.5 mr-1" /> Export PDF
+          <Button
+            variant="primary"
+            size="sm"
+            onClick={() => exportPilotEvidenceToExcelCsv(assets, alerts)}
+            className="flex items-center gap-1.5 font-bold"
+          >
+            <Download className="w-3.5 h-3.5 mr-1" /> Export Excel (CSV)
           </Button>
         </div>
       </div>

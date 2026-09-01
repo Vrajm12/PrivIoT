@@ -4,7 +4,7 @@ import React, { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
   FileText, Download, Printer, Shield, Server,
-  AlertTriangle, Activity, CheckCircle2, Lock
+  AlertTriangle, Activity, CheckCircle2, Lock, FileSpreadsheet
 } from "lucide-react";
 import { api } from "@/lib/api-client";
 import { Card, CardHeader, CardTitle } from "@/components/ui/Card";
@@ -14,6 +14,7 @@ import { RiskScore } from "@/components/ui/RiskScore";
 import { LoadingState } from "@/components/ui/LoadingState";
 import { ErrorState } from "@/components/ui/ErrorState";
 import { formatDate } from "@/lib/utils";
+import { exportComplianceReportToExcelCsv, exportAssetsToExcelCsv } from "@/lib/export-utils";
 
 export default function ReportsPage() {
   const [reportType, setReportType] = useState("executive");
@@ -59,8 +60,21 @@ export default function ReportsPage() {
           <Button variant="secondary" size="sm" onClick={() => window.print()}>
             <Printer className="w-3.5 h-3.5 mr-1" /> Print Report
           </Button>
-          <Button variant="primary" size="sm" onClick={() => alert("Report exported to PDF.")}>
-            <Download className="w-3.5 h-3.5 mr-1" /> Export PDF
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => exportAssetsToExcelCsv(assets)}
+            className="flex items-center gap-1.5 text-xs font-mono"
+          >
+            <FileSpreadsheet className="w-3.5 h-3.5 mr-1 text-accent" /> Export Inventory CSV
+          </Button>
+          <Button
+            variant="primary"
+            size="sm"
+            onClick={() => exportComplianceReportToExcelCsv(reportType, assets, alerts)}
+            className="flex items-center gap-1.5 text-xs font-mono font-bold"
+          >
+            <Download className="w-3.5 h-3.5 mr-1" /> Export Excel (CSV)
           </Button>
         </div>
       </div>
@@ -99,7 +113,7 @@ export default function ReportsPage() {
         <div className="border-b border-surface-border pb-4 flex items-center justify-between">
           <div>
             <div className="text-base font-bold text-text-primary tracking-wider">PRIVIOT SHIELD SECURITY AUDIT</div>
-            <div className="text-[11px] text-text-muted mt-0.5">Scope: Pune Plant Floor (VLAN 10 Subnet 10.10.1.0/24)</div>
+            <div className="text-[11px] text-text-muted mt-0.5">Scope: 2.4GHz Wi-Fi Airspace & Plant Subnets</div>
           </div>
           <div className="text-right text-[11px] text-text-muted">
             <div>GENERATED: {new Date().toISOString().split("T")[0]}</div>
@@ -113,9 +127,9 @@ export default function ReportsPage() {
             <div className="p-4 bg-surface-secondary rounded border border-surface-border space-y-2">
               <div className="text-xs font-bold text-text-primary uppercase">Executive Summary</div>
               <p className="text-xs text-text-secondary leading-relaxed font-sans">
-                PrivIoT Shield is continuously monitoring 5 physical endpoints across the industrial VLAN. 
-                Identity confidence is corroborated at 80% known/inferred coverage with 1 device remaining truthfully labeled Generic IoT (35% confidence). 
-                All 5 devices are actively accumulating 48-hour MUD behavioral baselines. 1 critical DNS threat intelligence alert was isolated under human authorization.
+                PrivIoT Shield is continuously monitoring {assets.length} physical endpoints discovered via physical ESP32 Wi-Fi hardware scanning and passive telemetry. 
+                Identity confidence is corroborated at {assets.length > 0 ? Math.round(((knownCount + inferredCount) / assets.length) * 100) : 0}% known/inferred coverage with {unknownCount} devices remaining under active radio observation. 
+                All monitored endpoints are actively accumulating 48-hour behavioral baselines under zero-disruption audit safety.
               </p>
             </div>
 

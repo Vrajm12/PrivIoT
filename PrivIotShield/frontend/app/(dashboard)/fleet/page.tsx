@@ -5,16 +5,18 @@ import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 import {
   Server, Shield, Filter, Search, ArrowRight,
-  ShieldAlert, Activity, CheckCircle2, HelpCircle
+  ShieldAlert, Activity, CheckCircle2, HelpCircle, Download, FileSpreadsheet
 } from "lucide-react";
 import { api } from "@/lib/api-client";
 import { Card, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
+import { Button } from "@/components/ui/Button";
 import { RiskScore } from "@/components/ui/RiskScore";
 import { StatusIndicator } from "@/components/ui/StatusIndicator";
 import { LoadingState } from "@/components/ui/LoadingState";
 import { ErrorState } from "@/components/ui/ErrorState";
 import { formatDate } from "@/lib/utils";
+import { exportAssetsToExcelCsv } from "@/lib/export-utils";
 
 export default function FleetPage() {
   const [siteFilter, setSiteFilter] = useState("all");
@@ -80,6 +82,18 @@ export default function FleetPage() {
           <p className="text-xs text-text-secondary">
             Multi-site asset inventory, identity confidence stratification & cross-fleet risk filtering.
           </p>
+        </div>
+
+        <div>
+          <Button
+            variant="primary"
+            size="sm"
+            onClick={() => exportAssetsToExcelCsv(assets)}
+            disabled={assets.length === 0}
+            className="flex items-center gap-1.5 font-mono text-xs font-bold"
+          >
+            <Download className="w-3.5 h-3.5 mr-1" /> Export Fleet (CSV)
+          </Button>
         </div>
       </div>
 
@@ -172,41 +186,83 @@ export default function FleetPage() {
         </CardHeader>
 
         <div className="divide-y divide-surface-border font-mono text-xs">
-          {filteredAssets.map((asset) => (
-            <Link
-              key={asset.id}
-              href={`/assets/${asset.id}`}
-              className="py-3 px-3 flex items-center justify-between hover:bg-surface-elevated/60 transition-colors block"
-            >
-              <div className="flex items-center gap-4">
-                <div className="w-8 h-8 rounded bg-surface-elevated flex items-center justify-center text-accent">
-                  <Server className="w-4 h-4" />
-                </div>
-                <div className="space-y-0.5">
-                  <div className="font-semibold text-text-primary flex items-center gap-2">
-                    <span>{asset.vendor} {asset.model}</span>
-                    <Badge variant={asset.identity_confidence >= 0.85 ? "verified" : asset.identity_confidence >= 0.50 ? "outline" : "default"} size="sm">
-                      {asset.identity_confidence >= 0.85 ? "KNOWN" : asset.identity_confidence >= 0.50 ? "INFERRED" : "UNKNOWN"} ({Math.round((asset.identity_confidence || 0.35) * 100)}%)
-                    </Badge>
+          {filteredAssets.length === 0 ? (
+            <div className="py-12 text-center text-text-muted">
+              NO REAL ASSETS DISCOVERED — Start the ESP32 scanner to begin discovery.
+            </div>
+          ) : (
+            filteredAssets.map((asset) => {
+              const isEsp32 = asset.discovery_source === "esp32_wifi_scan" || asset.discovery_source === "esp32_ble_scan" || asset.reconciliation_method === "esp32_hardware_scanner" || asset.reconciliation_method === "esp32_ble_scanner";
+              return (
+                <Link
+                  key={asset.id}
+                  href={`/assets/${asset.id}`}
+                  className="py-3 px-3 flex items-center justify-between hover:bg-surface-elevated/60 transition-colors block"
+                >
+                  <div className="flex items-center gap-4">
+                    <div className="w-8 h-8 rounded bg-surface-elevated flex items-center justify-center text-accent">
+                      <Server className="w-4 h-4" />
+                    </div>
+                    <div className="space-y-0.5">
+                      <div className="font-semibold text-text-primary flex items-center gap-2">
+                        <span>{asset.vendor} {asset.model}</span>
+                        {isEsp32 && (
+                          <span className="px-1.5 py-0.5 rounded bg-security-verified/15 text-security-verified border border-security-verified/40 text-[9px] font-mono font-bold">
+                            REAL SENSOR
+                          </span>
+                        )}
+                        <Badge variant={asset.identity_confidence >= 0.85 ? "verified" : asset.identity_confidence >= 0.50 ? "outline" : "default"} size="sm">
+                          {asset.identity_confidence >= 0.85 ? "KNOWN" : asset.identity_confidence >= 0.50 ? "INFERRED" : "UNKNOWN"} ({Math.round((asset.identity_confidence || 0.35) * 100)}%)
+                        </Badge>
+                      </div>
+                      <div className="text-[11px] text-text-muted flex flex-wrap items-center gap-1.5">
+                        <span>{asset.ip_address === "0.0.0.0" ? "L2/Radio AP" : asset.ip_address}</span>
+                        <span>•</span>
+                        <span className="text-text-secondary font-mono">{asset.mac_address}</span>
+                        <span>•</span>
+                        <span>{asset.device_type}</span>
+                        {asset.hostname && asset.hostname !== "Unknown" && (
+                          <>
+                            <span>•</span>
+                            <span className="text-accent font-semibold">SSID: {asset.hostname}</span>
+                          </>
+                        )}
+                        {asset.rssi !== undefined && asset.rssi !== null && (
+                          <>
+                            <span>•</span>
+                            <span className="text-text-primary font-mono font-bold">RSSI: {asset.rssi} dBm</span>
+                          </>
+                        )}
+                        {asset.channel !== undefined && asset.channel !== null && (
+                          <>
+                            <span>•</span>
+                            <span className="text-text-muted font-mono">Ch {asset.channel}</span>
+                          </>
+                        )}
+                        {asset.observation_count !== undefined && asset.observation_count > 0 && (
+                          <>
+                            <span>•</span>
+                            <span className="text-accent font-mono">{asset.observation_count} Obs</span>
+                          </>
+                        )}
+                      </div>
+                    </div>
                   </div>
-                  <div className="text-[11px] text-text-muted">
-                    {asset.ip_address} • {asset.mac_address} • {asset.device_type}
-                  </div>
-                </div>
-              </div>
 
-              <div className="flex items-center gap-4 text-right">
-                <div>
-                  <div className="text-[10px] text-text-muted uppercase">48h Baseline</div>
-                  <StatusIndicator status={asset.behavioral_state === "STABLE" ? "healthy" : "drift"} label={asset.behavioral_state} />
-                </div>
-                <div>
-                  <div className="text-[10px] text-text-muted uppercase">PRI-v2</div>
-                  <RiskScore score={asset.current_pri_score} level={asset.pri_risk_level} size="sm" />
-                </div>
-              </div>
-            </Link>
-          ))}
+                  <div className="flex items-center gap-4 text-right">
+                    <div>
+                      <div className="text-[10px] text-text-muted uppercase">48h Baseline</div>
+                      <StatusIndicator status={asset.behavioral_state === "STABLE" ? "healthy" : "drift"} label={asset.behavioral_state} />
+                    </div>
+                    <div>
+                      <div className="text-[10px] text-text-muted uppercase">PRI-v2</div>
+                      <RiskScore score={asset.current_pri_score} level={asset.pri_risk_level} size="sm" />
+                    </div>
+                  </div>
+                </Link>
+              );
+            })
+          )}
         </div>
       </Card>
     </div>

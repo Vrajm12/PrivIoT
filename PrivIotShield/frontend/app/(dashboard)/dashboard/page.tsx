@@ -227,11 +227,17 @@ export default function DashboardPage() {
                 >
                   <div className="flex items-center gap-3">
                     <div className="space-y-0.5">
-                      <div className="text-xs font-semibold text-text-primary">
+                      <div className="text-xs font-semibold text-text-primary flex items-center gap-1.5">
                         {asset.vendor} {asset.model}
+                        {asset.discovery_source === "esp32_wifi_scan" || asset.discovery_source === "esp32_ble_scan" ? (
+                          <span className="px-1.5 py-0.2 rounded bg-security-verified/15 text-security-verified border border-security-verified/40 text-[8px] font-mono font-bold">
+                            REAL SENSOR
+                          </span>
+                        ) : null}
                       </div>
                       <div className="text-[11px] font-mono text-text-muted">
-                        {asset.ip_address} • {asset.mac_address}
+                        {asset.ip_address === "0.0.0.0" ? "Radio/L2" : asset.ip_address} • {asset.mac_address}
+                        {asset.hostname && asset.hostname !== "Unknown" && ` • SSID: ${asset.hostname}`}
                       </div>
                     </div>
                   </div>
@@ -244,57 +250,70 @@ export default function DashboardPage() {
             </div>
           </Card>
 
-          {/* "WHAT CHANGED?" Chronological Operational Feed */}
+            {/* "WHAT CHANGED?" Chronological Operational Feed */}
           <Card className="border-accent/30">
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-accent">
                 <Activity className="w-4 h-4 text-accent" />
-                WHAT CHANGED? (CHRONOLOGICAL OPERATIONAL FEED)
+                WHAT CHANGED? (LIVE OPERATIONAL EVENT FEED)
               </CardTitle>
               <span className="text-[11px] font-mono text-text-muted">
-                Authoritative real-time audit trail of all security state transitions
+                Authoritative real-time audit trail of all physical sensor security state transitions
               </span>
             </CardHeader>
 
             <div className="divide-y divide-surface-border font-mono text-xs">
-              <Link href="/alerts/1" className="py-2.5 px-2 flex items-center justify-between hover:bg-surface-elevated/60 transition-colors rounded block">
-                <div className="space-y-0.5">
-                  <div className="flex items-center gap-2">
-                    <Badge variant="critical" size="sm">THREAT ALERT</Badge>
-                    <span className="font-semibold text-text-primary">Critical DNS Match: dark-iot-c2.net</span>
-                  </div>
-                  <div className="text-[11px] text-text-muted">Asset #6 (Hikvision Camera) • Risk Escalated (+2.5)</div>
+              {alerts.length === 0 && assets.length === 0 ? (
+                <div className="py-4 text-center text-xs text-text-muted font-mono">
+                  No security events recorded. Physical ESP32 sensor scanning airspace.
                 </div>
-                <div className="text-right text-[10px] text-text-muted">
-                  <span>View Evidence →</span>
-                </div>
-              </Link>
+              ) : (
+                <>
+                  {alerts.slice(0, 3).map((alert) => (
+                    <Link
+                      key={alert.id}
+                      href={`/alerts/${alert.id}`}
+                      className="py-2.5 px-2 flex items-center justify-between hover:bg-surface-elevated/60 transition-colors rounded block"
+                    >
+                      <div className="space-y-0.5">
+                        <div className="flex items-center gap-2">
+                          <Badge variant={alert.severity} size="sm">
+                            {alert.alert_type === "open_unencrypted_wifi" ? "AIRSPACE THREAT" : "ALERT"}
+                          </Badge>
+                          <span className="font-semibold text-text-primary">{alert.title}</span>
+                        </div>
+                        <div className="text-[11px] text-text-muted">{alert.description}</div>
+                      </div>
+                      <div className="text-right text-[10px] text-text-muted">
+                        <span>{formatDate(alert.created_at)} →</span>
+                      </div>
+                    </Link>
+                  ))}
 
-              <Link href="/assets" className="py-2.5 px-2 flex items-center justify-between hover:bg-surface-elevated/60 transition-colors rounded block">
-                <div className="space-y-0.5">
-                  <div className="flex items-center gap-2">
-                    <Badge variant="verified" size="sm">DISCOVERY</Badge>
-                    <span className="font-semibold text-text-primary">5 New Plant Floor Devices Profiled</span>
-                  </div>
-                  <div className="text-[11px] text-text-muted">VLAN 10 Subnet • Automatic passive correlation</div>
-                </div>
-                <div className="text-right text-[10px] text-text-muted">
-                  <span>View Inventory →</span>
-                </div>
-              </Link>
-
-              <Link href="/behavior" className="py-2.5 px-2 flex items-center justify-between hover:bg-surface-elevated/60 transition-colors rounded block">
-                <div className="space-y-0.5">
-                  <div className="flex items-center gap-2">
-                    <Badge variant="outline" size="sm">BASELINE</Badge>
-                    <span className="font-semibold text-text-primary">48-Hour Learning Window Initialized</span>
-                  </div>
-                  <div className="text-[11px] text-text-muted">15 Total Observations • Zero false positives on NTP/DNS</div>
-                </div>
-                <div className="text-right text-[10px] text-text-muted">
-                  <span>View Baselines →</span>
-                </div>
-              </Link>
+                  {assets.slice(0, 2).map((asset) => (
+                    <Link
+                      key={asset.id}
+                      href={`/assets/${asset.id}`}
+                      className="py-2.5 px-2 flex items-center justify-between hover:bg-surface-elevated/60 transition-colors rounded block"
+                    >
+                      <div className="space-y-0.5">
+                        <div className="flex items-center gap-2">
+                          <Badge variant="verified" size="sm">DISCOVERY</Badge>
+                          <span className="font-semibold text-text-primary">
+                            Discovered: {asset.hostname || asset.mac_address} ({asset.vendor})
+                          </span>
+                        </div>
+                        <div className="text-[11px] text-text-muted">
+                          {asset.mac_address} • RSSI: {asset.rssi ?? -50} dBm • {asset.observation_count ?? 1} Observations
+                        </div>
+                      </div>
+                      <div className="text-right text-[10px] text-text-muted">
+                        <span>View Asset →</span>
+                      </div>
+                    </Link>
+                  ))}
+                </>
+              )}
             </div>
           </Card>
         </div>

@@ -167,29 +167,22 @@ with app.app_context():
         logger.error(f"Failed to create admin user: {str(e)}")
         db.session.rollback()
 
-    # Seed initial pilot inventory if empty
+    # Seed default hardware scanner collector if empty (No mock assets seeded)
     try:
-        from models import Asset, Device
-        if Asset.query.count() == 0:
-            admin_user = User.query.filter_by(username='admin').first()
-            admin_id = admin_user.id if admin_user else 1
-            pilot_assets = [
-                Asset(tenant_id="default_tenant", user_id=admin_id, ip_address="192.168.1.101", mac_address="00:12:17:88:41:A2", vendor="Hikvision", model="DS-2CD2042WD-I", device_type="IP Camera", identity_confidence=0.92, network_scope="HQ Alpha (192.168.1.0/24)"),
-                Asset(tenant_id="default_tenant", user_id=admin_id, ip_address="192.168.1.102", mac_address="50:C7:BF:12:34:56", vendor="TP-Link", model="Kasa HS100", device_type="Smart Plug", identity_confidence=0.88, network_scope="HQ Alpha (192.168.1.0/24)"),
-                Asset(tenant_id="default_tenant", user_id=admin_id, ip_address="192.168.1.103", mac_address="CC:6E:A4:91:02:11", vendor="Samsung", model="QN65Q80B", device_type="Smart TV", identity_confidence=0.85, network_scope="HQ Alpha (192.168.1.0/24)"),
-                Asset(tenant_id="default_tenant", user_id=admin_id, ip_address="192.168.1.104", mac_address="00:1E:0B:44:99:AA", vendor="HP", model="LaserJet Enterprise M608", device_type="Printer", identity_confidence=0.90, network_scope="HQ Alpha (192.168.1.0/24)"),
-                Asset(tenant_id="default_tenant", user_id=admin_id, ip_address="192.168.1.107", mac_address="94:E6:86:99:88:77", vendor="Generic Espressif", model="ESP32 Board", device_type="Generic IoT", identity_confidence=0.42, network_scope="HQ Alpha (192.168.1.0/24)")
-            ]
-            db.session.add_all(pilot_assets)
-            
-            for pa in pilot_assets:
-                d = Device(name=f"{pa.vendor} {pa.model}", device_type=pa.device_type, manufacturer=pa.vendor, model=pa.model, ip_address=pa.ip_address, mac_address=pa.mac_address, user_id=admin_id)
-                db.session.add(d)
-            
+        from models import Collector
+        if Collector.query.count() == 0:
+            from collector_manager import collector_manager
+            collector_manager.enroll_collector(
+                tenant_id="default_tenant",
+                site_id="default_site",
+                name="ESP32_Hardware_Scanner",
+                collector_type="wifi_scanner",
+                network_scope="2.4GHz Wi-Fi / BLE Airspace"
+            )
             db.session.commit()
-            logger.info("Pilot lab inventory seeded successfully")
+            logger.info("Default ESP32 hardware collector seeded successfully")
     except Exception as e:
-        logger.warning(f"Pilot asset seeding note: {e}")
+        logger.warning(f"Collector initialization note: {e}")
         db.session.rollback()
 
 logger.info("PrivIoT application initialized successfully")

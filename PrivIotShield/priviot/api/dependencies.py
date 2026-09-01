@@ -99,26 +99,41 @@ def get_authenticated_collector(
     tenant_id: str = Depends(get_current_tenant)
 ) -> Collector:
     """
-    Verify edge collector authentication token using telemetry_engine.
+    Verify edge collector authentication token using telemetry_engine with strict Flask context.
     """
-    raw_token = x_sensor_token
-    if not raw_token and authorization and authorization.startswith("Bearer "):
-        raw_token = authorization.split(" ")[1]
+    with flask_app.app_context():
+        raw_token = x_sensor_token
+        if not raw_token and authorization and authorization.startswith("Bearer "):
+            raw_token = authorization.split(" ")[1]
 
-    if not raw_token:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Missing collector authentication token (X-Sensor-Token)."
-        )
+        if not raw_token:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Missing collector authentication token (X-Sensor-Token)."
+            )
 
-    from priviot.engines.telemetry import telemetry_engine
-    collector = telemetry_engine.authenticate_collector(raw_token)
+        raw_token = raw_token.strip()
 
-    if not collector:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid or revoked collector authentication token."
-        )
+        from priviot.engines.telemetry import telemetry_engine
+        collector = telemetry_engine.authenticate_collector(raw_token)
 
-    return collector
+        if not collector:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid or revoked collector authentication token."
+            )
+
+        if collector.status == "REVOKED":
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid or revoked collector authentication token."
+            )
+
+        if collector.tenant_id != tenant_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"Collector tenant mismatch. Sensor registered to '{collector.tenant_id}', request sent for '{tenant_id}'."
+            )
+
+        return collector
 
