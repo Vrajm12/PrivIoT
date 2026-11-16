@@ -147,3 +147,13 @@ Authenticate all requests by supplying `X-API-Key: <YOUR_API_KEY>` in the HTTP h
 
 ## 📄 License
 This project is licensed under the MIT License — see the [LICENSE](LICENSE) file for details.
+
+
+---
+
+## Author, Case Study & Related Writing
+
+- **Architecture Case Study:** [PrivIoT Shield on veerajmatnale.me](https://veerajmatnale.me/work/priviot)
+- **Deep Dive Article:** [How I Built PrivIoT Shield: Autonomous IoT Security Architecture](https://veerajmatnale.me/writing/how-i-built-priviot-shield)
+- **Ransomware & Zero-Trust Research:** [ML-RDM Preprint](https://veerajmatnale.me/research) · [Zero-Trust RBAC Patterns](https://veerajmatnale.me/writing/zero-trust-rbac-patterns)
+- **Built by:** [Veeraj Sanjog Matnale](https://veerajmatnale.me) · [Triverse Solutions Private Limited](https://triversesolutions.co.in)
